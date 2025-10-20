@@ -4,7 +4,7 @@ description: >
   Git の日常作業（ブランチ操作、コミット作成、メッセージ整形、チェリーピック、タグ付け、PullRequest 作成）
   を安全に支援する Skill。
   ユーザーが「git」「ブランチ」「コミット」「タグ」「PR」などを言及したときに使用する。
-allowed-tools: Bash, Read, Grep, Glob
+allowed-tools: Bash(git:*), Bash(gh:*), Read, Grep, Glob
 ---
 
 # Git Helper
