@@ -1,5 +1,5 @@
 ---
-name: git:commt
+name: git:commit
 description: Commit Git worktree
 ---
 

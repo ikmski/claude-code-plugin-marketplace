@@ -39,7 +39,7 @@ plugins/                         # Directory containing individual plugins
 ## Current Plugins
 
 ### git-tools Plugin
-Location: `plugins/git/`
+Location: `plugins/git-tools/`
 
 Provides Git-related slash commands:
 
