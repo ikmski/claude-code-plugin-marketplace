@@ -7,5 +7,10 @@
         "url": "https://github.com/guildstudio/claude-code-plugin-marketplace"
     },
     "plugins": [
+        {
+            "name": "git",
+            "source": "./plugins/git",
+            "description": "Git tools for Claude Code"
+        }
     ]
 }

@@ -1,0 +1,9 @@
+{
+    "name": "git-tools",
+    "description": "Git tools for Claude Code",
+    "author": {
+        "name": "Masaki IKEDA",
+        "email": "ikeda@arstechguild.inc"
+    },
+    "keywords": ["git"]
+}
