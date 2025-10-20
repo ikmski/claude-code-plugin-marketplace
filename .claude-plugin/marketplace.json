@@ -1,0 +1,11 @@
+{
+    "name": "arstech-guild-claude-code-plugins",
+    "description": "ARSTECH GUILD Claude Code Plugins",
+    "owner": {
+        "name": "Masaki IKEDA",
+        "email": "ikeda@arstechguild.inc",
+        "url": "https://github.com/guildstudio/claude-code-plugin-marketplace"
+    },
+    "plugins": [
+    ]
+}
