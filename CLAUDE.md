@@ -45,6 +45,7 @@ Provides Git-related slash commands:
 
 - `/git-tools:git:commit` - Commits changes in the git worktree (reviews changes and creates commit)
 - `/git-tools:git:pr` - Creates a GitHub Pull Request from current branch (accepts base branch as `$1`, defaults to repository default branch if not specified)
+- `/git-tools:git:review` - Reviews changes before commit (checks for debug code, TODO comments, security issues, code quality, etc.)
 
 ## Adding New Plugins
 
