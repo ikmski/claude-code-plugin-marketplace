@@ -11,6 +11,11 @@
             "name": "git-tools",
             "source": "./plugins/git-tools",
             "description": "Git tools for Claude Code"
+        },
+        {
+            "name": "utilities",
+            "source": "./plugins/utilities",
+            "description": "Utility tools for Claude Code"
         }
     ]
 }

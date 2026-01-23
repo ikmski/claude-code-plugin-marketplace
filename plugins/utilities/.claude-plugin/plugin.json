@@ -1,0 +1,9 @@
+{
+    "name": "utilities",
+    "description": "utility tools for Claude Code",
+    "author": {
+        "name": "Masaki IKEDA",
+        "email": "ikeda.masaki@gmail.com"
+    },
+    "keywords": ["utility"]
+}
