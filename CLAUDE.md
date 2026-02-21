@@ -16,6 +16,13 @@ plugins/                         # Directory containing individual plugins
   {plugin-name}/
     .claude-plugin/plugin.json   # Plugin metadata
     commands/                    # Slash command definitions (markdown files)
+    skills/                      # Skill definitions (optional)
+      {skill-name}/
+        SKILL.md                 # Skill definition and instructions
+        reference.md             # Reference information (optional)
+        examples.md              # Conversation examples (optional)
+    hooks/                       # Hook definitions (optional)
+      hooks.json                 # Hook event handlers
 ```
 
 ## Plugin Architecture
@@ -36,23 +43,50 @@ plugins/                         # Directory containing individual plugins
   - Command prompt/instructions in the body (can be in Japanese or other languages)
   - Commands can accept arguments via `$1`, `$2`, etc.
 
+### Skills (`plugins/{name}/skills/{skill-name}/`)
+- Skills provide specialized knowledge and workflows to extend Claude's capabilities
+- `SKILL.md` - メインのスキル定義ファイル。YAML frontmatter に `name`、`description`、`allowed-tools` を記載し、本文にガードレールや手順を記述する
+- `reference.md` - 詳細なリファレンス情報（コマンド一覧、オプション説明など）
+- `examples.md` - 会話例（ユーザーとの典型的なやり取りのサンプル）
+- `SKILL.md` の `allowed-tools` でスキルが使用できるツールを制限できる（例: `Bash(git:*)`, `Read`, `Glob`）
+
+### Hooks (`plugins/{name}/hooks/hooks.json`)
+- Claude Code のライフサイクルイベントに応じて実行されるシェルコマンドを定義する
+- サポートされるイベント: `Notification`（通知時）、`Stop`（タスク完了時）など
+- 各フックは `type: "command"` と実行する `command` 文字列を持つ
+
 ## Current Plugins
 
 ### git-tools Plugin
 Location: `plugins/git-tools/`
 
-Provides Git-related slash commands:
+Provides Git-related slash commands and a skill:
 
+**Slash Commands:**
 - `/git-tools:git:commit` - Commits changes in the git worktree (reviews changes and creates commit)
 - `/git-tools:git:pr` - Creates a GitHub Pull Request from current branch (accepts base branch as `$1`, defaults to repository default branch if not specified)
 - `/git-tools:git:review` - Reviews changes before commit (checks for debug code, TODO comments, security issues, code quality, etc.)
+
+**Skills:**
+- `git-helper` - Git の日常作業（ブランチ操作、コミット作成、メッセージ整形、チェリーピック、タグ付け、PR 作成）を安全に支援するスキル。`allowed-tools: Bash(git:*), Bash(gh:*), Read, Grep, Glob` で使用ツールを制限している
+
+### utilities Plugin
+Location: `plugins/utilities/`
+
+Provides hooks for desktop notifications:
+
+**Hooks:**
+- `Notification` イベント - `notify-send` でデスクトップ通知を送信
+- `Stop` イベント（タスク完了時）- `notify-send` で「Task Completed」をデスクトップ通知
 
 ## Adding New Plugins
 
 1. Create plugin directory under `plugins/{plugin-name}/`
 2. Add plugin metadata in `plugins/{plugin-name}/.claude-plugin/plugin.json`
 3. Add slash commands as markdown files in `plugins/{plugin-name}/commands/{namespace}/`
-4. Register plugin in `.claude-plugin/marketplace.json`
+4. (Optional) Add skills in `plugins/{plugin-name}/skills/{skill-name}/SKILL.md`
+5. (Optional) Add hooks in `plugins/{plugin-name}/hooks/hooks.json`
+6. Register plugin in `.claude-plugin/marketplace.json`
 
 ## Command Naming Convention
 
@@ -62,3 +96,7 @@ Example: `/git-tools:git:commit` where:
 - `git-tools` = plugin name
 - `git` = namespace (subdirectory under commands/)
 - `commit` = command name (filename without .md)
+
+## Development Notes
+
+このリポジトリはビルドシステムやテストフレームワークを持たない。すべてのプラグイン定義は純粋な **Markdown / JSON** ファイルで構成されており、コンパイルやトランスパイルは不要。変更後は Claude Code にインストールし直して動作を確認する。
