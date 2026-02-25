@@ -47,17 +47,20 @@ Leader（あなた）
   ├─ .agent-team/ ワークスペース作成（context.md に課題定義のみ記録）
   ├─ Sub-Leader を Agent Teams チームメイトとして起動
   │
-  ├─ ← Sub-Leader から編成案を SendMessage で受信
+  ├─ ← Sub-Leader から編成案（各メンバーの MBR プロンプト付き）を SendMessage で受信
   ├─ ユーザーへ編成案提示・承認取得
   ├─ → Sub-Leader に承認を SendMessage で伝達
+  ├─ 全初期メンバーを Task で起動（Sub-Leader 提供の MBR プロンプト使用）
+  ├─ → Sub-Leader に「全メンバー起動完了」を SendMessage で通知
   │
   │  Sub-Leader（チーム運営を全て担う）
-  │    ├─ チームメイト起動（並列または逐次）
+  │    ├─ TaskCreate → team-roster.md 作成
   │    ├─ SendMessage でチームメイトと連携
-  │    ├─ Red-Team 起動 → 修正対応
-  │    ├─ QA-Manager 起動
+  │    ├─ [SPAWN_REQUEST] で Red-Team 起動依頼 → Leader が起動
+  │    ├─ [SPAWN_REQUEST] で QA-Manager 起動依頼 → Leader が起動
   │    └─ Leader に最終報告を SendMessage で送信
   │
+  ├─ ← Sub-Leader から [SPAWN_REQUEST] を受信 → Task でメンバー起動 → 完了通知
   ├─ ← Sub-Leader から最終報告を受信
   ├─ SendMessage(shutdown_request) で全チームメイトをシャットダウン
   └─ TeamDelete → ユーザーへ最終報告
@@ -192,6 +195,8 @@ Sub-Leader はこのファイルに以下を追記・管理します：
    - 問題があれば Sub-Leader に `SendMessage` で差し戻す
 6. **ユーザーへ編成案を提示・承認取得**: 受け取った編成案をユーザーに提示し、承認を得る
 7. **Sub-Leader に承認を `SendMessage` で伝達**: 承認後、実行開始を指示する
+8. **全初期メンバーを `Task` で起動**: Sub-Leader が提供した MBR プロンプトを使用して、全初期チームメイト（Red-Team・QA-Manager を除く）を Agent Teams メンバーとして起動する。起動完了後、Sub-Leader に `SendMessage` で「全メンバー起動完了」を通知する
+9. **スポーンリクエストを処理**: Sub-Leader から `[SPAWN_REQUEST]` が届いたら、指定されたプロンプトで対象メンバーを `Task` で起動し、Sub-Leader に起動完了を `SendMessage` で通知する（詳細はセクション 9 を参照）
 
 **Leader がやらないこと**: 課題分析、役割定義、依存関係整理、チームメイトへの直接指示
 
@@ -204,14 +209,20 @@ Task ツール:
   name: "sub-leader"
   prompt: |
     あなたはこのチームの Sub-Leader です。
-    Leader（ファシリテーター）からの委任を受け、課題分析・チーム編成・チームメイト運営を全て担います。
+    Leader（ファシリテーター）からの委任を受け、課題分析・チーム編成設計・チームメイト運営を全て担います。
+
+    ⚠️ 厳守事項（削除・緩和禁止）：
+    - Task ツールでのチームメイト起動は禁止（メンバー起動は全て Leader が行う）
+    - SendMessage(type: "shutdown_request") の送信は禁止
+    - TeamDelete の呼び出しは禁止
 
     # Phase 1: 課題分析と編成案作成（Leader の承認前）
 
     1. .agent-team/context.md を読み込み、課題の性質・規模・技術領域を分析する
     2. 必要な役割を定義する（最大 8 名、Red-Team + QA-Manager 必須）
     3. 依存関係と自律性レベルを決定する
-    4. SendMessage で Leader に編成案を報告する（以下の形式で）：
+    4. 各メンバーの MBR プロンプトを作成する（Mission・Boundary・Resources を含む完全なプロンプト。各 Boundary に禁止事項 3 点を必ず含めること）
+    5. SendMessage で Leader に編成案を報告する（以下の形式で）：
 
     ```
     チーム名: {チーム名}
@@ -225,24 +236,56 @@ Task ツール:
     | QA-Manager | 要件充足確認・最終レポート | {番目} | L1 |
 
     依存関係: {説明}
+
+    ## 各メンバーの MBR プロンプト
+
+    ### {役割名}
+    subagent_type: {general-purpose/Explore/etc.}
+    name: {識別名}
+    prompt: |
+      # Mission
+      {達成すべき目標}
+      # Boundary
+      - 書き込みは .agent-team/artifacts/{role-name}/ のみ
+      - Task ツールでのエージェント起動禁止
+      - SendMessage(type: "shutdown_request") 送信禁止
+      - TeamDelete 呼び出し禁止
+      # Resources
+      {必要なリソース}
+
+    ### Red-Team
+    （MBR プロンプト同様）
+
+    ### QA-Manager
+    （MBR プロンプト同様）
     ```
 
-    # Phase 2: チーム運営（Leader からの承認通知を受けた後）
+    # Phase 2: チーム運営（Leader からの「全メンバー起動完了」通知を受けた後）
 
-    Leader から「承認」の通知を受けたら、以下を実施する：
+    Leader から「全メンバー起動完了」の通知を受けたら、以下を実施する：
 
-    5. TaskCreate でタスク登録し、addBlockedBy で依存関係を設定する
-    6. .agent-team/team-roster.md を作成する
-    7. Task(subagent_type=..., team_name="{チーム名}", name="{役割名}", prompt=...) でチームメイトを起動する
-       ※ 全チームメイトは team_name と name を指定した Agent Teams メンバーとして起動すること
+    6. TaskCreate でタスク登録し、addBlockedBy で依存関係を設定する
+    7. .agent-team/team-roster.md を作成する
     8. SendMessage でチームメイトと連携し、進捗確認・ブロッカー解消を行う
-    9. issues.md を監視し、必要に応じて計画変更・追加メンバー起動を行う
-    10. 実装完了後に Red-Team → QA-Manager を順次起動する
-    11. 全成果物を集約し、Leader に最終報告を SendMessage で送る
+    9. issues.md を監視し、必要に応じて計画変更を行う
+    10. 追加メンバーが必要な場合は、以下の形式で Leader にスポーンリクエストを送信する：
+
+        [SPAWN_REQUEST]
+        subagent_type: {タイプ}
+        name: {識別名}
+        prompt: |
+          {完全な MBR プロンプト（Boundary に禁止事項 3 点を含めること）}
+        reason: {起動が必要な理由}
+        [/SPAWN_REQUEST]
+
+    11. 実装完了後に Red-Team → QA-Manager の [SPAWN_REQUEST] を Leader に送信する
+    12. 全成果物を集約し、Leader に最終報告を SendMessage で送る
 
     # Boundary（境界）
     - Sub-Leader 自身の成果物は .agent-team/artifacts/sub-leader/ に出力する
-    - チームメイト起動は必ず team_name と name を指定すること（SubAgent は使用しない）
+    - Task ツールでのチームメイト起動は禁止（メンバー起動は全て Leader が行う）
+    - SendMessage(type: "shutdown_request") の送信は禁止
+    - TeamDelete の呼び出しは禁止
 
     # Resources（参照可能なリソース）
     - .agent-team/context.md: 課題全体の文脈（必ず最初に読む）
@@ -266,7 +309,7 @@ Task ツール:
 
 ## 4. メンバーエージェント起動プロトコル
 
-Sub-Leader がチームメイトを起動する際に使用する MBR プロンプトテンプレートです。
+Leader がチームメイトを起動する際に使用する MBR プロンプトテンプレートです。Sub-Leader が作成した MBR プロンプトをこのテンプレートに沿って確認・使用します。
 
 ### MBR プロンプトテンプレート（Mission-Boundary-Resources）
 
@@ -283,6 +326,9 @@ Task ツール:
     # Boundary（境界）
     - 書き込みは .agent-team/artifacts/{role-name}/ のみ
     - 他チームメイトの artifacts への書き込み禁止
+    - Task ツールでのエージェント起動禁止
+    - SendMessage(type: "shutdown_request") 送信禁止
+    - TeamDelete 呼び出し禁止
     - （役割固有の禁止事項があれば追記）
 
     # Resources（参照可能なリソース）
@@ -326,9 +372,9 @@ Task ツール:
 いかなる編成であっても、以下の **3 名** は必ず含めてください。
 
 **Sub-Leader（チーム運営役）**
-- 課題分析・チーム編成設計・チームメイト起動・進捗管理・介入判断を担う
-- Leader の承認後、全チームメイトを Agent Teams メンバーとして起動する責務を持つ
-- Red-Team と QA-Manager の起動タイミングを判断し、結果を Leader に報告する
+- 課題分析・チーム編成設計・各メンバーの MBR プロンプト作成・進捗管理・介入判断を担う
+- Leader の承認後、スポーンリクエスト（[SPAWN_REQUEST]）で Leader にチームメイト起動を依頼する
+- Red-Team と QA-Manager の起動タイミングを判断し、[SPAWN_REQUEST] を Leader に送信する
 
 **Red-Team（攻撃・批判役）**
 - 提案された設計や実装に対して、意図的に脆弱性・論理の破綻・エッジケースを攻撃する
@@ -382,7 +428,7 @@ Sub-Leader を経由しないことで Sub-Leader の負荷を下げ、チーム
 Red-Team の指摘事項の修正が完了するまで、QA-Manager には進めません。
 
 **Red-Team 指摘後の修正フロー**:
-1. **修正責任の割り当て**: 元の実装メンバーがまだシャットダウンしていなければ Sub-Leader が `SendMessage` で修正を依頼する。シャットダウン済みの場合は Sub-Leader が新メンバーを起動して修正を担当させる
+1. **修正責任の割り当て**: 元の実装メンバーがまだシャットダウンしていなければ Sub-Leader が `SendMessage` で修正を依頼する。シャットダウン済みの場合は Sub-Leader が `[SPAWN_REQUEST]` を Leader に送り、Leader が新メンバーを起動して修正を担当させる
 2. **修正完了の確認**: 全指摘事項が修正済みであることを Sub-Leader が確認する
 3. **再検証の判断**: 指摘が根本的な設計変更を要する場合は Red-Team による再検証を実施する。軽微な修正（タイポ、小さなバグ）は QA-Manager が兼任して確認する
 
@@ -391,6 +437,19 @@ Red-Team の指摘事項の修正が完了するまで、QA-Manager には進め
 ユーザーは環境を整える「謙虚な庭師」であり、細かな実装には口出ししません。
 - 全 Teammate の作業と QA-Manager の最終チェックが完了した段階で、最終成果物とレポートをユーザーに提示し、承認を求めてください
 - 途中で重大な文脈の欠落が発生した場合のみ、ユーザーに助言を求めてください
+
+### F. メンバー管理権限の一本化（Leader 専権事項）
+
+チームメイトのライフサイクル管理（起動・シャットダウン・チーム解散）は **Leader のみ** が行います。
+
+**Sub-Leader およびその他の全メンバーに禁止する操作**:
+- `Task` ツールでのチームメイト起動
+- `SendMessage(type: "shutdown_request")` の送信
+- `TeamDelete` の呼び出し
+
+**スポーンリクエストプロトコル**: Sub-Leader が追加メンバーの起動が必要と判断した場合、`[SPAWN_REQUEST]...[/SPAWN_REQUEST]` 形式で Leader に `SendMessage` を送信します。Leader がリクエストを受け取り、対象メンバーを `Task` で起動し、Sub-Leader に完了を通知します。詳細はセクション 9 を参照してください。
+
+**この制約の目的**: 無制限なエージェント起動のリスク排除、メンバーライフサイクルの一元管理、チーム構成の透明性確保。
 
 ---
 
@@ -476,9 +535,9 @@ Leader は Sub-Leader からの `SendMessage` の受信と `issues.md`/`decision
 
 チームメイトの起動に失敗した場合（Task ツールがエラーを返した場合）：
 
-1. **記録**: Sub-Leader がエラー内容を `issues.md` に記録し、Leader に `SendMessage` で報告する
-2. **リトライ**: 一時的な失敗であれば、Sub-Leader が同じプロンプトで再起動を試みる
-3. **代替手段**: 再起動が困難な場合、Sub-Leader が自ら当該タスクを実行するか、他のメンバーに役割を委任する
+1. **記録**: Leader がエラー内容を `issues.md` に記録し、Sub-Leader に `SendMessage` で状況を通知する
+2. **リトライ**: 一時的な失敗であれば、Leader が同じプロンプトで再起動を試みる
+3. **代替手段**: 再起動が困難な場合、Leader が Sub-Leader に `SendMessage` で状況を伝え、Sub-Leader が代替計画（他メンバーへの役割委任等）を立案して `[SPAWN_REQUEST]` を送る
 
 ### チームメイトからの応答がない（タイムアウト）
 
@@ -494,4 +553,53 @@ Red-Team が根本的な設計の欠陥を発見した場合：
 
 1. **Sub-Leader が判断**: 修正コストを評価し、部分修正か再設計かを決定する
 2. **Leader へ報告**: ユーザーの意思決定が必要な場合（スコープ変更、大規模な再設計が必要な場合）は Leader に報告し、ユーザーへ確認を求める
-3. **計画変更**: 再設計が必要な場合は、影響を受けるメンバーへの再タスクを割り当て、TaskCreate で追加タスクを登録する
+3. **計画変更**: 再設計が必要な場合は、影響を受けるメンバーへの再タスクを割り当て、TaskCreate で追加タスクを登録する。新メンバーが必要な場合は `[SPAWN_REQUEST]` を Sub-Leader が Leader に送信する
+
+---
+
+## 9. スポーンリクエストプロトコル
+
+### リクエスト形式
+
+Sub-Leader（またはその他のメンバー）が追加エージェントの起動が必要と判断した場合、以下の形式で Leader に `SendMessage` を送信します：
+
+```
+[SPAWN_REQUEST]
+subagent_type: {general-purpose / Explore / Plan / Bash}
+name: {チームメンバー識別名}
+prompt: |
+  # Mission
+  {達成すべき目標}
+
+  # Boundary
+  - 書き込みは .agent-team/artifacts/{role-name}/ のみ
+  - Task ツールでのエージェント起動禁止
+  - SendMessage(type: "shutdown_request") 送信禁止
+  - TeamDelete 呼び出し禁止
+
+  # Resources
+  {参照可能なリソース}
+reason: {このメンバーの起動が必要な理由}
+[/SPAWN_REQUEST]
+```
+
+### Leader の処理手順
+
+`[SPAWN_REQUEST]` を受信したら、以下を実行します：
+
+1. **禁止事項の確認**: プロンプトの Boundary に禁止事項 3 点（Task 起動禁止・shutdown_request 禁止・TeamDelete 禁止）が含まれていることを確認する。含まれていなければ追加する
+2. **起動**: `Task(subagent_type=..., team_name="{チーム名}", name="{識別名}", prompt=...)` でメンバーを起動する
+3. **完了通知**: 起動完了後、Sub-Leader に `SendMessage` で起動完了を通知する
+
+```
+SendMessage(
+  type="message",
+  recipient="sub-leader",
+  content="{識別名} を起動しました。",
+  summary="{識別名} 起動完了通知"
+)
+```
+
+### 複数同時リクエストの取り扱い
+
+複数の `[SPAWN_REQUEST]` が一度に届いた場合、Leader は全て並列で起動します（同一メッセージで複数 Task）。全起動完了後に一括で Sub-Leader に通知します。

@@ -117,6 +117,7 @@ TeamDelete（パラメータ不要）
 |------|------|-----|
 | SendMessage(message) | 特定メンバーへの通知・質問 | ブロッカー報告、依頼 |
 | SendMessage(broadcast) | 全メンバーへの重要通知（慎重に使用） | 方針変更、緊急停止 |
+| [SPAWN_REQUEST] | Sub-Leader → Leader へのメンバー起動依頼 | Red-Team 起動、追加エンジニア起動 |
 | artifacts/ | 永続的な成果物 | レポート、設計書、コード |
 | issues.md | 発見した課題の非同期共有 | バグ発見、リスク記録 |
 | decisions.md | 判断根拠の記録 | 設計判断、技術選択 |
@@ -132,18 +133,21 @@ TeamDelete（パラメータ不要）
 | Sub-Leader 起動 | ✅ | |
 | 課題分析 | | ✅ |
 | チーム編成設計 | | ✅ |
-| チームメイト起動 | | ✅ |
+| 各メンバーの MBR プロンプト作成 | | ✅ |
+| チームメイト起動（Task） | ✅ | ❌ |
 | タスク管理（TaskCreate/Update） | | ✅ |
 | チームメイト連携（SendMessage） | | ✅ |
 | 編成案のユーザー提示 | ✅ | |
 | 承認の Sub-Leader への伝達 | ✅ | |
+| 初期メンバー起動完了通知 | ✅ | |
 | 進捗監視・介入判断 | | ✅ |
-| Red-Team 起動 | | ✅ |
-| QA-Manager 起動 | | ✅ |
+| Red-Team 起動依頼（[SPAWN_REQUEST]） | | ✅ |
+| QA-Manager 起動依頼（[SPAWN_REQUEST]） | | ✅ |
+| Red-Team / QA-Manager 起動（Task） | ✅ | ❌ |
 | 最終報告の集約 | | ✅ |
 | 最終報告のユーザー提示 | ✅ | |
-| シャットダウン（shutdown_request） | ✅ | |
-| TeamDelete | ✅ | |
+| シャットダウン（shutdown_request） | ✅ | ❌ |
+| TeamDelete | ✅ | ❌ |
 
 ---
 
@@ -265,10 +269,9 @@ TeamDelete（パラメータ不要）
 **Phase 2（チーム運営）で Sub-Leader が行うこと**:
 - `TaskCreate` でタスク登録し、`addBlockedBy` で依存関係を設定する
 - `.agent-team/team-roster.md` を作成する
-- チームメイトを `Task(subagent_type, team_name, name, prompt)` で起動する（SubAgent 禁止）
-- `SendMessage` でチームメイトと連携し、進捗確認・ブロッカー解消を行う
-- `issues.md` を監視し、必要に応じて計画変更・追加メンバー起動を行う
-- 実装完了後に Red-Team → QA-Manager を順次起動する
+- Leader からの「全メンバー起動完了」通知を受け取り、`SendMessage` でチームメイトと連携し、進捗確認・ブロッカー解消を行う
+- `issues.md` を監視し、必要に応じて計画変更・`[SPAWN_REQUEST]` 送信を行う
+- 実装完了後に Red-Team → QA-Manager の `[SPAWN_REQUEST]` を Leader に送信する
 - 全成果物を集約し、Leader に最終報告を `SendMessage` で送る
 
 **Boundary（境界）**:
@@ -298,6 +301,10 @@ TeamDelete（パラメータ不要）
 
 **Boundary（境界）**
 - 書き込み禁止ディレクトリを明示する
+- 以下の 3 点は全メンバーの Boundary に必須（禁止事項として明記）：
+  - `Task` ツールでのエージェント起動禁止
+  - `SendMessage(type: "shutdown_request")` 送信禁止
+  - `TeamDelete` 呼び出し禁止
 - 役割固有の禁止事項があれば追記する
 - リスクが高い操作（本番 DB 変更など）を明示的に禁止する
 
@@ -533,14 +540,14 @@ QA-Manager           → 正確性確認・最終仕上げ
 [タスク3] ─┘
 ```
 
-チームメイト並列起動（同一メッセージで複数 Task を呼び出す）:
+チームメイト並列起動（Leader が同一メッセージで複数 Task を呼び出す）:
 ```
-// Sub-Leader がメッセージ内で並列に Task ツールを呼び出す
+// Leader がメッセージ内で並列に Task ツールを呼び出す（Sub-Leader の MBR プロンプトを使用）
 Task(team_name="my-team", name="agent-a", ...),
 Task(team_name="my-team", name="agent-b", ...),
-Task(team_name="my-team", name="agent-c", ...)  // 同時起動
-↓ 全完了を待つ（SendMessage で報告を受信）
-Task(team_name="my-team", name="integrator", ...)
+Task(team_name="my-team", name="agent-c", ...)  // 同時起動（Leader が実行）
+↓ 全完了を Leader が確認 → Sub-Leader に起動完了通知（SendMessage）
+// 追加メンバーが必要な場合: Sub-Leader が [SPAWN_REQUEST] を Leader に送信 → Leader が起動
 ```
 
 ### パターン B: 逐次（依存関係あり）
@@ -575,3 +582,49 @@ pending → in_progress → completed
 ```
 
 Sub-Leader は各チームメイトの完了を TaskUpdate で記録し、TaskList で全体進捗を把握すること。
+
+---
+
+## スポーンリクエストリファレンス
+
+### [SPAWN_REQUEST] フォーマット
+
+Sub-Leader が追加メンバーの起動を Leader にリクエストする際の形式：
+
+```
+[SPAWN_REQUEST]
+subagent_type: {general-purpose / Explore / Plan / Bash}
+name: {チームメンバー識別名}
+prompt: |
+  # Mission
+  {達成すべき目標}
+
+  # Boundary
+  - 書き込みは .agent-team/artifacts/{role-name}/ のみ
+  - Task ツールでのエージェント起動禁止
+  - SendMessage(type: "shutdown_request") 送信禁止
+  - TeamDelete 呼び出し禁止
+
+  # Resources
+  {参照可能なリソース}
+reason: {起動が必要な理由}
+[/SPAWN_REQUEST]
+```
+
+### Leader の処理フロー
+
+1. `[SPAWN_REQUEST]` を受信する
+2. Boundary に禁止事項 3 点が含まれていることを確認（なければ追加）
+3. `Task` でメンバーを起動する
+4. Sub-Leader に起動完了を `SendMessage` で通知する
+
+### 起動完了通知の形式
+
+```json
+{
+  "type": "message",
+  "recipient": "sub-leader",
+  "content": "{識別名} を起動しました。",
+  "summary": "{識別名} 起動完了通知"
+}
+```

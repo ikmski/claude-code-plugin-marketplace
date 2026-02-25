@@ -39,29 +39,34 @@ Task(
   name="sub-leader",
   prompt="""
   あなたはこのチームの Sub-Leader です。
-  Leader（ファシリテーター）からの委任を受け、課題分析・チーム編成・チームメイト起動・
-  進捗管理・結果集約を全て担います。
+  Leader（ファシリテーター）からの委任を受け、課題分析・チーム編成設計・チームメイト運営を全て担います。
+
+  ⚠️ 厳守事項（削除・緩和禁止）：
+  - Task ツールでのチームメイト起動は禁止（メンバー起動は全て Leader が行う）
+  - SendMessage(type: "shutdown_request") の送信は禁止
+  - TeamDelete の呼び出しは禁止
 
   # Phase 1: 課題分析と編成案作成
 
   1. .agent-team/context.md を読み込み、課題を分析する
   2. 必要な役割を定義する（Red-Team + QA-Manager 必須）
   3. 依存関係と自律性レベルを決定する
-  4. SendMessage で Leader に編成案を報告する
+  4. 各メンバーの MBR プロンプトを作成する（Boundary に禁止事項 3 点を含めること）
+  5. SendMessage で Leader に編成案（テーブル + 各メンバーの MBR プロンプト）を報告する
 
-  # Phase 2: チーム運営（Leader からの承認通知を受けた後）
+  # Phase 2: チーム運営（Leader からの「全メンバー起動完了」通知を受けた後）
 
-  5. TaskCreate でタスク登録（addBlockedBy で依存関係設定）
-  6. .agent-team/team-roster.md を作成する
-  7. チームメイトを Agent Teams メンバーとして起動する:
-     Task(subagent_type=..., team_name="session-bug-fix", name="{役割名}", prompt=...)
+  6. TaskCreate でタスク登録（addBlockedBy で依存関係設定）
+  7. .agent-team/team-roster.md を作成する
   8. SendMessage でチームメイトと連携し、進捗確認・ブロッカー解消を行う
-  9. 実装完了後に Red-Team → QA-Manager を順次起動する
+  9. 実装完了後に Red-Team → QA-Manager の [SPAWN_REQUEST] を Leader に送信する
   10. 全成果物を集約し、Leader に最終報告を SendMessage で送る
 
   # Boundary
   - 自身の成果物は .agent-team/artifacts/sub-leader/ に出力する
-  - チームメイト起動は必ず team_name と name を指定すること
+  - Task ツールでのチームメイト起動は禁止
+  - SendMessage(type: "shutdown_request") の送信は禁止
+  - TeamDelete の呼び出しは禁止
 
   # Resources
   - .agent-team/context.md（必ず最初に読む）
@@ -79,10 +84,40 @@ Task(
 > |---|---|---|---|
 > | アナリスト | セッション無効化の根本原因を特定する | 1番目 | L1 |
 > | バグフィクサー | 特定された根本原因を修正する | 2番目（アナリスト完了後） | L1 |
-> | Red-Team | 修正の妥当性・副作用・セキュリティリスクを批判的に検証する | 3番目 | L1 |
-> | QA-Manager | 初期要件の達成を確認し最終レポートを作成する | 4番目 | L1 |
+> | Red-Team | 修正の妥当性・副作用・セキュリティリスクを批判的に検証する | 3番目（[SPAWN_REQUEST]） | L1 |
+> | QA-Manager | 初期要件の達成を確認し最終レポートを作成する | 4番目（[SPAWN_REQUEST]） | L1 |
 >
 > 依存関係: アナリスト → バグフィクサー → Red-Team → QA-Manager（逐次）
+>
+> ## 各メンバーの MBR プロンプト
+>
+> ### アナリスト
+> subagent_type: Explore / name: analyst
+> prompt: |
+>   # Mission
+>   セッション管理に関連するコードを調査し、ログイン時にセッションが稀に無効になる根本原因を特定してください。
+>   # Boundary
+>   - 書き込みは .agent-team/artifacts/analyst/ のみ
+>   - コードの変更禁止
+>   - Task ツールでのエージェント起動禁止
+>   - SendMessage(type: "shutdown_request") 送信禁止
+>   - TeamDelete 呼び出し禁止
+>   # Resources
+>   - .agent-team/context.md（必ず最初に読む）
+>   - src/auth/（認証・セッション関連コード）
+>
+> ### バグフィクサー
+> subagent_type: general-purpose / name: bugfixer
+> prompt: |
+>   # Mission
+>   アナリストが特定したセッション無効化の根本原因を修正してください。
+>   # Boundary
+>   - 書き込みは .agent-team/artifacts/bugfixer/ のみ（コード変更は src/auth/ のみ）
+>   - Task ツールでのエージェント起動禁止
+>   - SendMessage(type: "shutdown_request") 送信禁止
+>   - TeamDelete 呼び出し禁止
+>   # Resources
+>   - .agent-team/artifacts/analyst/investigation-report.md（調査結果）
 
 **Leader（ユーザーへ提示）:**
 
@@ -102,30 +137,18 @@ Task(
 **ユーザー:**
 > 進めてください。
 
-**Leader（Sub-Leader に承認を SendMessage で伝達）:**
+**Leader（Sub-Leader に承認を SendMessage で伝達し、初期メンバーを起動）:**
 
 ```
+// 承認を Sub-Leader に通知
 SendMessage(
   type="message",
   recipient="sub-leader",
-  content="編成案が承認されました。チーム運営を開始してください。",
-  summary="編成案承認・運営開始指示"
+  content="編成案が承認されました。初期メンバーを起動します。",
+  summary="編成案承認・初期メンバー起動開始"
 )
-```
 
-**Sub-Leader（チーム運営・以降は Sub-Leader が直接担当）:**
-
-```
-// タスク登録
-TaskCreate: "アナリスト: セッション管理調査"
-TaskCreate: "バグフィクサー: 修正実装"（addBlockedBy: [アナリストID]）
-TaskCreate: "Red-Team: 修正検証"（addBlockedBy: [バグフィクサーID]）
-TaskCreate: "QA-Manager: 最終確認"（addBlockedBy: [Red-TeamID]）
-
-// team-roster.md 作成
-Write: .agent-team/team-roster.md
-
-// Step 1: アナリスト起動（Agent Teams メンバーとして）
+// Step 1: アナリストを起動（Sub-Leader 提供の MBR プロンプトを使用）
 Task(
   subagent_type="Explore",
   team_name="session-bug-fix",
@@ -138,6 +161,9 @@ Task(
   # Boundary
   - 書き込みは .agent-team/artifacts/analyst/ のみ
   - コードの変更禁止
+  - Task ツールでのエージェント起動禁止
+  - SendMessage(type: "shutdown_request") 送信禁止
+  - TeamDelete 呼び出し禁止
 
   # Resources
   - .agent-team/context.md（必ず最初に読む）
@@ -154,7 +180,19 @@ Task(
   7. 完了: .agent-team/artifacts/analyst/investigation-report.md を出力する
   """)
 
-// Step 2: バグフィクサー起動（アナリスト完了後）
+// アナリスト起動完了を Sub-Leader に通知
+SendMessage(
+  type="message",
+  recipient="sub-leader",
+  content="analyst を起動しました。アナリスト完了後にバグフィクサーを起動します。",
+  summary="analyst 起動完了通知"
+)
+```
+
+**（アナリスト完了後）Leader がバグフィクサーを起動:**
+
+```
+// Sub-Leader から指示を受け、バグフィクサーを起動
 Task(
   subagent_type="general-purpose",
   team_name="session-bug-fix",
@@ -167,6 +205,9 @@ Task(
   - 書き込みは .agent-team/artifacts/bugfixer/ のみ（修正コードは isolation: "worktree" で隔離された環境で変更すること）
   - 他チームメイトの artifacts への書き込み禁止
   - worktree を使用しない場合は担当ソースディレクトリ（src/auth/）のみへの書き込みとし、他のソースファイルへの書き込みは禁止
+  - Task ツールでのエージェント起動禁止
+  - SendMessage(type: "shutdown_request") 送信禁止
+  - TeamDelete 呼び出し禁止
 
   # Resources
   - .agent-team/context.md（必ず最初に読む）
@@ -180,9 +221,53 @@ Task(
   7. 完了: .agent-team/artifacts/bugfixer/fix-description.md を出力する
   """)
 
-// Step 3: Red-Team 起動
-// Step 4: QA-Manager 起動
-// （以降、Sub-Leader がチームメイト連携・Red-Team ゲート管理を担当）
+SendMessage(
+  type="message",
+  recipient="sub-leader",
+  content="bugfixer を起動しました。",
+  summary="bugfixer 起動完了通知"
+)
+```
+
+**Sub-Leader（チーム運営・タスク管理・チームメイト連携）:**
+
+```
+// タスク登録
+TaskCreate: "アナリスト: セッション管理調査"
+TaskCreate: "バグフィクサー: 修正実装"（addBlockedBy: [アナリストID]）
+
+// team-roster.md 作成
+Write: .agent-team/team-roster.md
+
+// Leader からの起動完了通知後、SendMessage でチームメイトと連携
+
+// 実装完了後、Red-Team の [SPAWN_REQUEST] を Leader に送信
+SendMessage(
+  type="message",
+  recipient="team-lead",
+  content="""
+  [SPAWN_REQUEST]
+  subagent_type: general-purpose
+  name: red-team
+  prompt: |
+    # Mission
+    修正の妥当性・副作用・セキュリティリスクを批判的に検証してください。
+    # Boundary
+    - 書き込みは .agent-team/artifacts/red-team/ のみ
+    - Task ツールでのエージェント起動禁止
+    - SendMessage(type: "shutdown_request") 送信禁止
+    - TeamDelete 呼び出し禁止
+    # Resources
+    - .agent-team/artifacts/bugfixer/fix-description.md
+    - src/auth/
+  reason: バグフィクサーの修正が完了しました。批判的検証を依頼します。
+  [/SPAWN_REQUEST]
+  """,
+  summary="Red-Team 起動リクエスト"
+)
+
+// QA-Manager も同様に [SPAWN_REQUEST] で依頼
+// 全成果物集約後、Leader に最終報告を SendMessage で送る
 ```
 
 **Sub-Leader → Leader（最終報告を SendMessage）:**
@@ -308,24 +393,22 @@ SendMessage(
 )
 ```
 
-**Sub-Leader（チーム運営）:**
+**Sub-Leader（編成案を Leader に報告）:**
+
+Sub-Leader は Phase 1 でチーム編成案と各メンバーの MBR プロンプトを作成し、Leader に SendMessage で報告します（researcher、architect、frontend-engineer、backend-engineer、db-engineer、integrator の MBR プロンプトを含む）。
+
+**Leader（初期メンバーを起動・Sub-Leader に通知）:**
 
 ```
-// タスク登録・team-roster.md 作成後、チームメイトを順次起動
+// Step 1: リサーチャー起動（Sub-Leader 提供の MBR プロンプトを使用）
+Task(subagent_type="Explore", team_name="jwt-auth", name="researcher", prompt="...")
 
-// Step 1: リサーチャー起動
-Task(
-  subagent_type="Explore",
-  team_name="jwt-auth",
-  name="researcher",
-  prompt="...")
+SendMessage(type="message", recipient="sub-leader", content="researcher を起動しました。", summary="researcher 起動完了通知")
 
 // Step 2: アーキテクト起動（リサーチャー完了後）
-Task(
-  subagent_type="general-purpose",
-  team_name="jwt-auth",
-  name="architect",
-  prompt="...")
+Task(subagent_type="general-purpose", team_name="jwt-auth", name="architect", prompt="...")
+
+SendMessage(type="message", recipient="sub-leader", content="architect を起動しました。", summary="architect 起動完了通知")
 
 // Step 3: フロント・バック・DB を並列起動（同一メッセージで3つの Task を呼び出す）
 Task(
@@ -339,6 +422,9 @@ Task(
   # Boundary
   - 担当ディレクトリ: src/frontend/auth/ のみ
   - 他ディレクトリへの書き込み禁止
+  - Task ツールでのエージェント起動禁止
+  - SendMessage(type: "shutdown_request") 送信禁止
+  - TeamDelete 呼び出し禁止
 
   # Resources
   - .agent-team/context.md（必ず最初に読む）
@@ -358,6 +444,9 @@ Task(
   # Boundary
   - 担当ディレクトリ: src/backend/auth/ のみ
   - 他ディレクトリへの書き込み禁止
+  - Task ツールでのエージェント起動禁止
+  - SendMessage(type: "shutdown_request") 送信禁止
+  - TeamDelete 呼び出し禁止
 
   # Resources
   - .agent-team/context.md（必ず最初に読む）
@@ -376,6 +465,9 @@ Task(
   # Boundary
   - 書き込みは .agent-team/artifacts/db-engineer/ のみ（マイグレーションは db/migrations/ にも可）
   - 既存テーブルへの破壊的変更禁止
+  - Task ツールでのエージェント起動禁止
+  - SendMessage(type: "shutdown_request") 送信禁止
+  - TeamDelete 呼び出し禁止
 
   # Approach Hints（L2: 方針ヒント）
   - 既存の users テーブルとの外部キー整合性を維持すること
@@ -388,9 +480,48 @@ Task(
   - 報告: 重大な問題は SendMessage で Sub-Leader に報告する
   """)
 
-// Step 4: インテグレーター起動（並列3名の完了後）
-// Step 5: Red-Team 起動
-// Step 6: QA-Manager 起動
+// 並列3名起動完了を Sub-Leader に通知
+SendMessage(
+  type="message",
+  recipient="sub-leader",
+  content="frontend-engineer、backend-engineer、db-engineer を並列起動しました。",
+  summary="並列3名 起動完了通知"
+)
+
+// インテグレーター起動（並列3名完了後・Sub-Leader の指示を受けて）
+Task(subagent_type="general-purpose", team_name="jwt-auth", name="integrator", prompt="...")
+```
+
+**Sub-Leader（チーム運営・[SPAWN_REQUEST] で Red-Team/QA-Manager を依頼）:**
+
+```
+// タスク登録・team-roster.md 作成後、Leader からの起動完了通知を受けて SendMessage でチームメイトと連携
+
+// 実装完了後、[SPAWN_REQUEST] で Red-Team を依頼
+SendMessage(
+  type="message",
+  recipient="team-lead",
+  content="""
+  [SPAWN_REQUEST]
+  subagent_type: general-purpose
+  name: red-team
+  prompt: |
+    # Mission
+    セキュリティ・論理・実装品質を批判的に検証してください。
+    # Boundary
+    - 書き込みは .agent-team/artifacts/red-team/ のみ
+    - Task ツールでのエージェント起動禁止
+    - SendMessage(type: "shutdown_request") 送信禁止
+    - TeamDelete 呼び出し禁止
+    # Resources
+    - .agent-team/artifacts/（全成果物）
+  reason: 実装フェーズが完了しました。批判的検証を依頼します。
+  [/SPAWN_REQUEST]
+  """,
+  summary="Red-Team 起動リクエスト"
+)
+
+// QA-Manager も同様に [SPAWN_REQUEST] で依頼
 // Sub-Leader が最終報告を Leader に SendMessage
 ```
 
@@ -471,10 +602,14 @@ SendMessage(
 )
 ```
 
-**Sub-Leader（チーム運営）:**
+**Sub-Leader（編成案を Leader に報告・チーム運営）:**
+
+Sub-Leader は Phase 1 で nextjs-researcher と remix-researcher の MBR プロンプトを作成し、Leader に SendMessage で報告します。
+
+**Leader（調査担当 2 名を並列起動・Sub-Leader に通知）:**
 
 ```
-// タスク登録後、調査担当2名を並列起動（Agent Teams メンバーとして）
+// 調査担当2名を並列起動（同一メッセージで2つの Task を呼び出す）
 Task(
   subagent_type="general-purpose",
   team_name="fw-selection",
@@ -486,6 +621,9 @@ Task(
   # Boundary
   - 書き込みは .agent-team/artifacts/nextjs-researcher/ のみ
   - Remix との比較は行わない（それは QA-Manager の役割）
+  - Task ツールでのエージェント起動禁止
+  - SendMessage(type: "shutdown_request") 送信禁止
+  - TeamDelete 呼び出し禁止
 
   # Resources
   - .agent-team/context.md（プロジェクトの技術スタック・要件を把握）
@@ -504,6 +642,9 @@ Task(
   # Boundary
   - 書き込みは .agent-team/artifacts/remix-researcher/ のみ
   - Next.js との比較は行わない（それは QA-Manager の役割）
+  - Task ツールでのエージェント起動禁止
+  - SendMessage(type: "shutdown_request") 送信禁止
+  - TeamDelete 呼び出し禁止
 
   # Resources
   - .agent-team/context.md（プロジェクトの技術スタック・要件を把握）
@@ -511,43 +652,48 @@ Task(
   - 報告: 完了を SendMessage で Sub-Leader に報告する
   """)
 
-// 調査完了後、Red-Team 起動（Agent Teams メンバーとして）
-Task(
-  subagent_type="general-purpose",
-  team_name="fw-selection",
-  name="red-team",
-  prompt="""
-  # Mission
-  両フレームワークの調査レポートを批判的に検証し、偏り・見落とし・情報の不正確性を
-  洗い出してください。推奨案を出すのではなく、批判・指摘に徹してください。
+// 並列2名起動完了を Sub-Leader に通知
+SendMessage(
+  type="message",
+  recipient="sub-leader",
+  content="nextjs-researcher、remix-researcher を並列起動しました。",
+  summary="並列2名 起動完了通知"
+)
+```
 
-  # Boundary
-  - 書き込みは .agent-team/artifacts/red-team/ のみ
+**Sub-Leader（チーム運営・[SPAWN_REQUEST] で Red-Team/QA-Manager を依頼）:**
 
-  # Resources
-  - .agent-team/artifacts/nextjs-researcher/report.md
-  - .agent-team/artifacts/remix-researcher/report.md
-  - .agent-team/issues.md
-  - 報告: 重大な問題は SendMessage で Sub-Leader に報告する
-  """)
+```
+// タスク登録・team-roster.md 作成後、Leader からの起動完了通知を受けて SendMessage でチームメイトと連携
 
-// QA-Manager 起動（Red-Team 完了後）
-Task(
-  subagent_type="general-purpose",
-  team_name="fw-selection",
-  name="qa-manager",
-  prompt="""
-  # Mission
-  全成果物を統合し、プロジェクトに最適なフレームワークを推奨してください。
+// 調査完了後、[SPAWN_REQUEST] で Red-Team を依頼
+SendMessage(
+  type="message",
+  recipient="team-lead",
+  content="""
+  [SPAWN_REQUEST]
+  subagent_type: general-purpose
+  name: red-team
+  prompt: |
+    # Mission
+    両フレームワークの調査レポートを批判的に検証し、偏り・見落とし・情報の不正確性を
+    洗い出してください。推奨案を出すのではなく、批判・指摘に徹してください。
+    # Boundary
+    - 書き込みは .agent-team/artifacts/red-team/ のみ
+    - Task ツールでのエージェント起動禁止
+    - SendMessage(type: "shutdown_request") 送信禁止
+    - TeamDelete 呼び出し禁止
+    # Resources
+    - .agent-team/artifacts/nextjs-researcher/report.md
+    - .agent-team/artifacts/remix-researcher/report.md
+    - .agent-team/issues.md
+  reason: 両調査が完了しました。批判的検証を依頼します。
+  [/SPAWN_REQUEST]
+  """,
+  summary="Red-Team 起動リクエスト"
+)
 
-  # Boundary
-  - 書き込みは .agent-team/artifacts/qa-manager/ のみ
-
-  # Resources
-  - .agent-team/artifacts/（全成果物）
-  - .agent-team/context.md（プロジェクト要件）
-  """)
-
+// QA-Manager も同様に [SPAWN_REQUEST] で依頼
 // Sub-Leader → Leader に最終報告を SendMessage
 ```
 
@@ -623,21 +769,18 @@ Task(
 **ユーザー:**
 > 進めて。
 
-**Leader（承認を Sub-Leader に SendMessage で伝達）:**
+**Leader（承認を Sub-Leader に伝達し、アナリストと移行エンジニアを起動）:**
 
 ```
+// 承認を Sub-Leader に通知
 SendMessage(
   type="message",
   recipient="sub-leader",
-  content="編成案が承認されました。チーム運営を開始してください。",
-  summary="編成案承認・運営開始指示"
+  content="編成案が承認されました。初期メンバーを起動します。",
+  summary="編成案承認・初期メンバー起動開始"
 )
-```
 
-**Sub-Leader（チーム運営）:**
-
-```
-// タスク登録後、アナリストを起動（Agent Teams メンバーとして）
+// アナリストを起動（Sub-Leader 提供の MBR プロンプトを使用）
 Task(
   subagent_type="Explore",
   team_name="data-migration",
@@ -650,6 +793,9 @@ Task(
   # Boundary
   - 書き込みは .agent-team/artifacts/analyst/ のみ
   - データベースへの書き込み禁止
+  - Task ツールでのエージェント起動禁止
+  - SendMessage(type: "shutdown_request") 送信禁止
+  - TeamDelete 呼び出し禁止
 
   # Resources
   - .agent-team/context.md
@@ -660,6 +806,23 @@ Task(
   6. 報告: 重大なブロッカーや想定外の問題は SendMessage で Sub-Leader に即時報告する
   7. 完了: .agent-team/artifacts/analyst/migration-analysis.md を出力する
   """)
+
+// アナリスト起動完了を Sub-Leader に通知
+SendMessage(
+  type="message",
+  recipient="sub-leader",
+  content="analyst を起動しました。",
+  summary="analyst 起動完了通知"
+)
+```
+
+**Sub-Leader（チーム運営・タスク登録・team-roster.md 作成）:**
+
+```
+// タスク登録
+TaskCreate: "アナリスト: スキーマ差異分析"
+// team-roster.md 作成
+Write: .agent-team/team-roster.md
 ```
 
 **（アナリストが issues.md に記録し、Sub-Leader に SendMessage で報告）:**
@@ -685,13 +848,47 @@ Task(
 アナリスト → Sub-Leader（SendMessage）:
 > 「循環参照と孤立データという重大なブロッカーを発見しました。データクレンジング担当の追加が必要です。issues.md を参照してください。」
 
-**Sub-Leader（SendMessage を受信後に計画変更・追加メンバー起動）:**
+**Sub-Leader（SendMessage を受信後に計画変更・[SPAWN_REQUEST] で data-cleaner を依頼）:**
 
 ```
 // 追加タスク登録
 TaskCreate: "データクレンジング担当: 孤立データ処理"（addBlockedBy: [アナリストID]）
 
-// データクレンジング担当を起動（Agent Teams メンバーとして）
+// データクレンジング担当の起動を Leader に [SPAWN_REQUEST] で依頼
+SendMessage(
+  type="message",
+  recipient="team-lead",
+  content="""
+  [SPAWN_REQUEST]
+  subagent_type: general-purpose
+  name: data-cleaner
+  prompt: |
+    # Mission
+    v1 データベースの孤立データと循環参照問題を解決し、v2 への移行を安全に行える
+    クレンジングスクリプトを作成してください。
+    # Boundary
+    - 書き込みは .agent-team/artifacts/data-cleaner/ のみ
+    - 本番 DB への直接書き込み禁止（スクリプトの作成のみ）
+    - Task ツールでのエージェント起動禁止
+    - SendMessage(type: "shutdown_request") 送信禁止
+    - TeamDelete 呼び出し禁止
+    # Resources
+    - .agent-team/context.md
+    - .agent-team/artifacts/analyst/migration-analysis.md
+    - .agent-team/issues.md（発見された問題の詳細）
+    - db/schema/v1/: 現行スキーマ
+    - 報告: 完了を SendMessage で Sub-Leader に報告する
+  reason: アナリストが循環参照と孤立データを発見しました。移行前にクレンジング担当が必要です。
+  [/SPAWN_REQUEST]
+  """,
+  summary="data-cleaner 起動リクエスト"
+)
+```
+
+**Leader（[SPAWN_REQUEST] を受信し data-cleaner を起動）:**
+
+```
+// [SPAWN_REQUEST] を受信 → Boundary に禁止事項 3 点が含まれていることを確認 → 起動
 Task(
   subagent_type="general-purpose",
   team_name="data-migration",
@@ -700,11 +897,12 @@ Task(
   # Mission
   v1 データベースの孤立データと循環参照問題を解決し、v2 への移行を安全に行える
   クレンジングスクリプトを作成してください。
-
   # Boundary
   - 書き込みは .agent-team/artifacts/data-cleaner/ のみ
   - 本番 DB への直接書き込み禁止（スクリプトの作成のみ）
-
+  - Task ツールでのエージェント起動禁止
+  - SendMessage(type: "shutdown_request") 送信禁止
+  - TeamDelete 呼び出し禁止
   # Resources
   - .agent-team/context.md
   - .agent-team/artifacts/analyst/migration-analysis.md
@@ -713,7 +911,18 @@ Task(
   - 報告: 完了を SendMessage で Sub-Leader に報告する
   """)
 
-// データクレンジング完了後、移行エンジニアを起動（L2: リスク考慮）
+// 起動完了を Sub-Leader に通知
+SendMessage(
+  type="message",
+  recipient="sub-leader",
+  content="data-cleaner を起動しました。",
+  summary="data-cleaner 起動完了通知"
+)
+```
+
+**（data-cleaner 完了後）Leader が移行エンジニアを起動（Sub-Leader の [SPAWN_REQUEST] を受けて）:**
+
+```
 Task(
   subagent_type="general-purpose",
   team_name="data-migration",
@@ -725,6 +934,9 @@ Task(
   # Boundary
   - 書き込みは .agent-team/artifacts/migration-engineer/ のみ
   - 本番 DB への直接書き込み禁止（スクリプトの作成のみ）
+  - Task ツールでのエージェント起動禁止
+  - SendMessage(type: "shutdown_request") 送信禁止
+  - TeamDelete 呼び出し禁止
 
   # Approach Hints（L2: リスク考慮）
   - ロールバック可能な設計にすること
@@ -739,13 +951,20 @@ Task(
   - 報告: 完了を SendMessage で Sub-Leader に報告する
   """)
 
-// Red-Team → QA-Manager を順次起動後、Sub-Leader → Leader に最終報告を SendMessage
+SendMessage(
+  type="message",
+  recipient="sub-leader",
+  content="migration-engineer を起動しました。",
+  summary="migration-engineer 起動完了通知"
+)
+
+// Red-Team → QA-Manager も Sub-Leader の [SPAWN_REQUEST] を受けて Leader が起動
 ```
 
 **Sub-Leader → Leader（SendMessage で最終報告）:**
 
 > 当初 4 名の計画でしたが、アナリストが SendMessage で報告した循環参照・孤立データ問題を受け、
-> データクレンジング担当を追加（計 5 名）しました。
+> [SPAWN_REQUEST] で data-cleaner の起動を依頼し、Leader に追加していただきました（計 5 名）。
 >
 > ## 達成したこと
 > - データクレンジングスクリプト: 孤立レコード 3% の安全な処理
@@ -769,7 +988,7 @@ TeamDelete()
 
 チーム作業が完了しました。
 
-当初 4 名の計画でしたが、アナリストが発見した循環参照・孤立データ問題を受け、Sub-Leader がデータクレンジング担当を追加（計 5 名）しました。
+当初 4 名の計画でしたが、アナリストが発見した循環参照・孤立データ問題を受け、Sub-Leader からの [SPAWN_REQUEST] でデータクレンジング担当を追加（計 5 名）しました。
 
 **成果:**
 - データクレンジングスクリプト: 孤立レコード 3% の安全な処理
