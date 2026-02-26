@@ -143,38 +143,13 @@ TeamDelete（パラメータ不要）
 
 ---
 
-## Leader 責務一覧
-
-| 責務 | Leader |
-|------|--------|
-| TeamCreate | ✅ |
-| ワークスペース作成（context.md・team-roster.md 全管理） | ✅ |
-| 課題分析 | ✅ |
-| チーム編成設計 | ✅ |
-| 各チームメイトの MBR プロンプト作成 | ✅ |
-| チームメイト起動（Task） | ✅ |
-| タスク管理（TaskCreate/Update） | ✅ |
-| チームメイト連携（SendMessage） | ✅ |
-| 編成案のユーザー提示 | ✅ |
-| 進捗監視・介入判断 | ✅ |
-| 追加チームメイトの判断・起動 | ✅ |
-| Red-Team 起動（Task） | ✅ |
-| QA-Manager 起動（Task） | ✅ |
-| 結果集約 | ✅ |
-| worktree ブランチの統合（git merge） | ✅ |
-| 最終報告のユーザー提示 | ✅ |
-| シャットダウン（shutdown_request） | ✅ |
-| TeamDelete | ✅ |
+> **Leader 責務**: SKILL.md セクション 1・4 を参照してください。
 
 ---
 
 ## 統合フェーズリファレンス
 
-### 前提条件チェックリスト
-
-- [ ] QA-Manager が全成果物を承認済み
-- [ ] Red-Team の全指摘が対応済み
-- [ ] 全実装系チームメイトが完了報告済み（worktree ブランチ名を明示）
+> 統合フェーズの手順は SKILL.md セクション 6b を参照してください。以下は git コマンドリファレンスです。
 
 ### マージコマンド
 
@@ -219,17 +194,7 @@ git diff main...{branch-name}
 
 ## `.agent-team/` ワークスペース仕様
 
-### ディレクトリ構造
-
-```
-.agent-team/
-  context.md          # 課題コンテキスト（Leader が作成・管理）
-  team-roster.md      # チーム編成と担当範囲（Leader が作成・管理）
-  issues.md           # チームメイトが発見した課題・ブロッカーの非同期記録
-  decisions.md        # 判断の根拠・採用した方針の知識共有
-  artifacts/
-    {role-name}/      # 各チームメイトの成果物（チームメイト自身が書き込む）
-```
+> ディレクトリ構造は SKILL.md セクション 3 を参照してください。以下は各ファイルのフォーマット詳細です。
 
 ### context.md フォーマット
 
@@ -306,9 +271,10 @@ git diff main...{branch-name}
 
 ## 必須チームメイト
 ### Red-Team
-- **ミッション**: 全成果物への批判的検証・脆弱性・矛盾・改善点の洗い出し
+- **ミッション**: 全成果物への批判的検証・全指摘クリアまでの自律ループ
 - **自律性レベル**: L1
-- **起動タイミング**: 実装フェーズ完了後
+- **起動タイミング**: 実装フェーズ完了後（Leader が1回起動するだけ）
+- **ループ**: 指摘→修正→再検証を自律的に繰り返し、全クリアで Leader に完了報告
 
 ### QA-Manager
 - **ミッション**: 要件充足確認・Red-Team 指摘の対応確認・最終レポート作成
@@ -322,30 +288,40 @@ git diff main...{branch-name}
 
 ## MBR プロンプトリファレンス
 
-### MBR とは
+> MBR（Mission-Boundary-Resources）の概要・各セクションの書き方は SKILL.md セクション 5 を参照してください。
 
-**Mission-Boundary-Resources** の略。チームメイトに「何をするか（Mission）」「何をしてはいけないか（Boundary）」「何を参照できるか（Resources）」を示し、方法はチームメイトに委ねる委任型プロンプト構造です。
+### Red-Team 専用テンプレート（自律ループ型）
 
-### 各セクションの書き方
+```
+Task ツール:
+  subagent_type: "general-purpose"
+  team_name: "{チーム名}"
+  name: "red-team"
+  prompt: |
+    # Mission（ミッション）
+    あなたは Red-Team として、成果物への批判的検証を行ってください。
+    **全ての指摘が解消されるまで自律的にループし、最終的に QA-Manager への移行承認を Leader に報告してください。**
 
-**Mission（ミッション）**
-- 「何を達成するか」を目標として記述する
-- 手順・ステップを列挙しない
-- 完了状態（Done とは何か）を明示する
+    # Procedure（自律ループ手順）
+    1. `.agent-team/artifacts/` 配下の全成果物を読み込み、脆弱性・矛盾・改善点を洗い出す
+    2. 指摘事項を `.agent-team/artifacts/red-team/review-round-N.md` に出力する（N はラウンド番号: 1, 2, 3…）
+    3. Leader に `SendMessage` で指摘内容を報告し、修正担当者のアサインを依頼する
+    4. 修正担当者から完了報告の `SendMessage` を受けたら、修正後の成果物を再検証する
+    5. 指摘が全てクリアになったら Leader に「全指摘クリア・QA-Manager 起動を承認します」と `SendMessage` で報告して完了
+    6. **3 ラウンドを超えても解消しない指摘がある場合は、その旨を Leader に報告してユーザーへのエスカレーションを促す**
 
-**Boundary（境界）**
-- 書き込み禁止ディレクトリを明示する
-- 以下の 3 点は全チームメイトの Boundary に必須（禁止事項として明記）：
-  - `Task` ツールでのチームメイト起動禁止
-  - `SendMessage(type: "shutdown_request")` 送信禁止
-  - `TeamDelete` 呼び出し禁止
-- 役割固有の禁止事項があれば追記する
-- リスクが高い操作（本番 DB 変更など）を明示的に禁止する
+    # Boundary（境界）
+    - 書き込みは `.agent-team/artifacts/red-team/` のみ
+    - プロジェクトのソースコードの変更禁止（読み取り専用）
+    - Task ツールでのチームメイト起動禁止
+    - SendMessage(type: "shutdown_request") 送信禁止
+    - TeamDelete 呼び出し禁止
 
-**Resources（参照可能なリソース）**
-- 参照すべきファイル・ディレクトリを列挙する
-- 他チームメイトの artifacts への参照許可を明示する
-- `Mission 完了後は必ず SendMessage で Leader に完了報告し、成果物の場所を明示すること` を必ず含める
+    # Resources（参照可能なリソース）
+    - `.agent-team/context.md`: 課題全体の文脈（必ず最初に読む）
+    - `.agent-team/artifacts/`: 全チームメイトの成果物（全て参照すること）
+    - `.agent-team/issues.md / decisions.md`: 発見済み課題と判断ログ
+```
 
 ### 良い例・悪い例
 

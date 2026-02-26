@@ -114,7 +114,7 @@ Task(
   """)
 ```
 
-**（バグフィクサー完了後）Leader が Red-Team を起動:**
+**（バグフィクサー完了後）Leader が Red-Team を起動（1 回のみ）:**
 
 ```
 Task(
@@ -123,20 +123,48 @@ Task(
   name="red-team",
   prompt="""
   # Mission
-  修正の妥当性・副作用・セキュリティリスクを批判的に検証してください。
+  あなたは Red-Team として、成果物への批判的検証を行ってください。
+  **全ての指摘が解消されるまで自律的にループし、最終的に QA-Manager への移行承認を Leader に報告してください。**
+
+  # Procedure（自律ループ手順）
+  1. `.agent-team/artifacts/` 配下の全成果物を読み込み、脆弱性・矛盾・改善点を洗い出す
+  2. 指摘事項を `.agent-team/artifacts/red-team/review-round-N.md` に出力する（N はラウンド番号: 1, 2, 3…）
+  3. Leader に `SendMessage` で指摘内容を報告し、修正担当者のアサインを依頼する
+  4. 修正担当者から完了報告の `SendMessage` を受けたら、修正後の成果物を再検証する
+  5. 指摘が全てクリアになったら Leader に「全指摘クリア・QA-Manager 起動を承認します」と `SendMessage` で報告して完了
+  6. **3 ラウンドを超えても解消しない指摘がある場合は、その旨を Leader に報告してユーザーへのエスカレーションを促す**
 
   # Boundary
-  - 書き込みは .agent-team/artifacts/red-team/ のみ
-  （標準 Boundary を適用）
+  - 書き込みは `.agent-team/artifacts/red-team/` のみ
+  - プロジェクトのソースコードの変更禁止（読み取り専用）
+  - Task ツールでのチームメイト起動禁止
+  - SendMessage(type: "shutdown_request") 送信禁止
+  - TeamDelete 呼び出し禁止
 
   # Resources
-  - .agent-team/artifacts/bugfixer/fix-description.md
-  - src/auth/
-  - Mission 完了後は必ず SendMessage で Leader に完了報告し、成果物の場所を明示すること
+  - `.agent-team/context.md`: 課題全体の文脈（必ず最初に読む）
+  - `.agent-team/artifacts/`: 全チームメイトの成果物（全て参照すること）
+  - `.agent-team/issues.md / decisions.md`: 発見済み課題と判断ログ
   """)
 ```
 
-**（Red-Team・QA-Manager 完了後）Leader（統合フェーズ・クリーンアップ・最終報告）:**
+**（Red-Team が指摘を Leader に報告後）Leader が修正担当者にアサイン:**
+
+```
+// Red-Team から「タイムアウト値が不適切」との指摘（review-round-1.md）を受け取る
+SendMessage(
+  type="message",
+  recipient="bugfixer",
+  content="Red-Team から指摘が届きました。.agent-team/artifacts/red-team/review-round-1.md を確認し、修正をお願いします。完了後は red-team に直接 SendMessage で報告してください（Leader 経由不要）。",
+  summary="Red-Team 指摘の修正依頼"
+)
+// bugfixer が修正完了 → red-team に直接 SendMessage → red-team が再検証
+// 全クリア確認後、red-team から Leader に「全指摘クリア・QA-Manager 起動を承認します」の報告
+```
+
+**（Red-Team 全クリア承認後）Leader が QA-Manager を起動（省略）**
+
+**（QA-Manager 完了後）Leader（統合フェーズ・クリーンアップ・最終報告）:**
 
 ```
 // artifacts/ と QA-Manager レポートを直接確認して集約
@@ -342,7 +370,8 @@ Task(
   - Mission 完了後は必ず SendMessage で Leader に完了報告し、成果物の場所を明示すること
   """)
 
-// Red-Team → QA-Manager も Leader が起動（実装完了後）
+// Red-Team・QA-Manager の起動フローは例 1 と同様
+// （Red-Team 自律ループ → 全クリア承認 → QA-Manager 起動）
 ```
 
 **Leader（クリーンアップ・最終報告）:**
