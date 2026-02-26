@@ -4,7 +4,7 @@
 
 ## Leader の役割
 
-**Leader（オーケストレーター）**: チーム全体を統括する。TeamCreate・ワークスペース作成・課題分析・チーム編成案作成（MBR プロンプト含む）・全チームメイトの起動（Task）・タスク管理・SendMessage によるチームメイト連携・進捗監視・結果集約・シャットダウン（shutdown_request）・TeamDelete・最終報告を担う。
+**Leader（オーケストレーター）**: チーム全体を統括する。TeamCreate・ワークスペース作成・課題分析・チーム編成案作成（MBR プロンプト含む）・全チームメイトの起動（Task）・タスク管理・SendMessage によるチームメイト連携・進捗監視・結果集約・worktree ブランチの統合（git merge）・シャットダウン（shutdown_request）・TeamDelete・最終報告を担う。
 
 **Leader がやらないこと**: 深い技術調査、実装作業、成果物の直接作成（これらはチームメイトに委任する）
 

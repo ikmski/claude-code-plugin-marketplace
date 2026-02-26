@@ -95,13 +95,14 @@ Task(
   subagent_type="general-purpose",
   team_name="session-bug-fix",
   name="bugfixer",
+  isolation="worktree",
   prompt="""
   # Mission
   アナリストが特定したセッション無効化の根本原因を修正してください。
 
   # Boundary
-  - 書き込みは .agent-team/artifacts/bugfixer/ のみ（修正コードは isolation: "worktree" で隔離された環境で変更すること）
-  - worktree を使用しない場合は担当ソースディレクトリ（src/auth/）のみへの書き込みとし、他のソースファイルへの書き込みは禁止
+  - 書き込みは .agent-team/artifacts/bugfixer/ のみ
+  - コード変更は worktree 内でのみ行うこと（プロジェクトルートの直接変更禁止）
   （標準 Boundary を適用）
 
   # Resources
@@ -109,7 +110,7 @@ Task(
   - .agent-team/artifacts/analyst/investigation-report.md（調査結果）
   - .agent-team/issues.md / decisions.md
   - src/auth/（修正対象コード）
-  - Mission 完了後は必ず SendMessage で Leader に完了報告し、成果物の場所を明示すること
+  - Mission 完了後は必ず SendMessage で Leader に完了報告し、**使用した worktree ブランチ名**と成果物の場所を明示すること
   """)
 ```
 
@@ -135,12 +136,20 @@ Task(
   """)
 ```
 
-**（Red-Team・QA-Manager 完了後）Leader（クリーンアップ・最終報告）:**
+**（Red-Team・QA-Manager 完了後）Leader（統合フェーズ・クリーンアップ・最終報告）:**
 
 ```
 // artifacts/ と QA-Manager レポートを直接確認して集約
 Read: .agent-team/artifacts/qa-manager/final-report.md
 
+// 統合フェーズ: worktree ブランチをマージ
+Bash: git worktree list
+// → .claude/worktrees/bugfixer-xxxx  /path/to/repo  [bugfixer-branch-abc123]
+
+Bash: git merge --no-ff bugfixer-branch-abc123
+// マージ完了。コミットハッシュ: a1b2c3d
+
+// クリーンアップ
 SendMessage(type="shutdown_request", recipient="analyst", content="作業完了。シャットダウンしてください。")
 SendMessage(type="shutdown_request", recipient="bugfixer", content="作業完了。シャットダウンしてください。")
 SendMessage(type="shutdown_request", recipient="red-team", content="作業完了。シャットダウンしてください。")
@@ -155,6 +164,12 @@ TeamDelete()
 **成果:** セッション無効化の原因は並行リクエスト時のレースコンディションと特定。ロック機構を追加して修正済み。
 
 Red-Team の指摘（タイムアウト値の見直し）も対応済みです。詳細は `.agent-team/artifacts/qa-manager/final-report.md` をご覧ください。
+
+**プロジェクトへの変更反映:**
+
+| worktree ブランチ | マージ先 | コミットハッシュ |
+|-------------------|---------|----------------|
+| bugfixer-branch-abc123 | main | a1b2c3d |
 
 ---
 
