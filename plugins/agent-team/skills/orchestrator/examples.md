@@ -41,11 +41,11 @@ Write: .agent-team/session-bug-fix/decisions.md（空ファイル）
 
 | 役割 | ミッション | 実行順 | 自律性レベル | mode |
 |---|---|---|---|---|
-| Chief of Staff | チーム運営全体の仲介・統合管理 | 最初（全体通じて稼働） | L1 | `"auto"` |
-| アナリスト | セッション無効化の根本原因を特定する | 1番目 | L1 | `"auto"` |
+| Chief of Staff | チーム運営全体の仲介・統合管理 | 最初（全体通じて稼働） | L1 | `"bypassPermissions"` |
+| アナリスト | セッション無効化の根本原因を特定する | 1番目 | L1 | `"bypassPermissions"` |
 | バグフィクサー | 特定された根本原因を修正する | 2番目（アナリスト完了後） | L1 | `"bypassPermissions"` |
-| Red-Team | 修正の妥当性・副作用・セキュリティリスクを批判的に検証する | 3番目 | L1 | `"auto"` |
-| QA-Manager | 初期要件の達成を確認し最終レポートを作成する | 4番目 | L1 | `"auto"` |
+| Red-Team | 修正の妥当性・副作用・セキュリティリスクを批判的に検証する | 3番目 | L1 | `"bypassPermissions"` |
+| QA-Manager | 初期要件の達成を確認し最終レポートを作成する | 4番目 | L1 | `"bypassPermissions"` |
 
 まず Chief of Staff を起動し、次にアナリストを起動します。
 
@@ -57,8 +57,10 @@ Task(
   subagent_type="general-purpose",
   team_name="session-bug-fix",
   name="chief-of-staff",
-  mode="auto",
+  mode="bypassPermissions",
   prompt="""
+  **絶対制約: コード実装禁止。書き込みは .agent-team/session-bug-fix/artifacts/chief-of-staff/ と git merge のみ。**
+
   # Mission
   あなたは Chief of Staff（参謀）として、チーム運営全体を仲介・統括してください。
   メンバーからの報告を受け、運用的判断を自律的に行います。Leader には要約報告のみ送信します。
@@ -99,8 +101,10 @@ Task(
   subagent_type="Explore",
   team_name="session-bug-fix",
   name="analyst",
-  mode="auto",
+  mode="bypassPermissions",
   prompt="""
+  **絶対制約: プロジェクトソースコードの変更禁止。書き込みは .agent-team/session-bug-fix/artifacts/analyst/ のみ。**
+
   # Mission
   セッション管理に関連するコードを調査し、ログイン時にセッションが稀に無効になる
   根本原因を特定してください。調査方法・範囲はあなたが判断してください。
@@ -164,8 +168,10 @@ Task(
   subagent_type="general-purpose",
   team_name="session-bug-fix",
   name="red-team",
-  mode="auto",
+  mode="bypassPermissions",
   prompt="""
+  **絶対制約: プロジェクトソースコードの変更禁止。書き込みは .agent-team/session-bug-fix/artifacts/red-team/ のみ。**
+
   # Mission
   あなたは Red-Team として、成果物への批判的検証を行ってください。
   **全ての指摘が解消されるまで自律的にループし、最終的に QA-Manager への移行承認を Chief of Staff に報告してください。**
@@ -303,11 +309,11 @@ Write: .agent-team/data-migration/decisions.md（空ファイル）
 
 | 役割 | ミッション | 実行順 | 自律性レベル | mode |
 |---|---|---|---|---|
-| Chief of Staff | チーム運営全体の仲介・統合管理 | 最初（全体通じて稼働） | L1 | `"auto"` |
-| アナリスト | v1/v2 のスキーマ差異と移行要件を分析する | 1番目 | L1 | `"auto"` |
+| Chief of Staff | チーム運営全体の仲介・統合管理 | 最初（全体通じて稼働） | L1 | `"bypassPermissions"` |
+| アナリスト | v1/v2 のスキーマ差異と移行要件を分析する | 1番目 | L1 | `"bypassPermissions"` |
 | 移行エンジニア | データ移行スクリプトを実装する | 2番目（アナリスト完了後） | L2（本番 DB 保護） | `"bypassPermissions"` |
-| Red-Team | 移行スクリプトのリスクと欠陥を徹底検証する | 3番目 | L1 | `"auto"` |
-| QA-Manager | 最終確認とレポート作成 | 4番目 | L1 | `"auto"` |
+| Red-Team | 移行スクリプトのリスクと欠陥を徹底検証する | 3番目 | L1 | `"bypassPermissions"` |
+| QA-Manager | 最終確認とレポート作成 | 4番目 | L1 | `"bypassPermissions"` |
 
 まず Chief of Staff を起動し、次にアナリストを起動します。
 
@@ -318,8 +324,10 @@ Task(
   subagent_type="general-purpose",
   team_name="data-migration",
   name="chief-of-staff",
-  mode="auto",
+  mode="bypassPermissions",
   prompt="""
+  **絶対制約: コード実装禁止。書き込みは .agent-team/data-migration/artifacts/chief-of-staff/ と git merge のみ。**
+
   # Mission
   あなたは Chief of Staff（参謀）として、チーム運営全体を仲介・統括してください。
   （標準 CoS テンプレートを適用）
@@ -345,8 +353,10 @@ Task(
   subagent_type="Explore",
   team_name="data-migration",
   name="analyst",
-  mode="auto",
+  mode="bypassPermissions",
   prompt="""
+  **絶対制約: プロジェクトソースコードの変更禁止。書き込みは .agent-team/data-migration/artifacts/analyst/ のみ。**
+
   # Mission
   v1 から v2 へのデータ移行に必要な情報を全て収集・分析してください。
   スキーマ差異、移行対象データ量、依存関係を明らかにしてください。
