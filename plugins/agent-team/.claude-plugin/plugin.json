@@ -1,6 +1,6 @@
 {
     "name": "agent-team",
-    "version": "0.3.0",
+    "version": "0.4.0",
     "description": "課題に応じて最適なチームを動的に編成する「チーム・オブ・チームズ」型マルチエージェントプラグイン",
     "author": {
         "name": "Masaki IKEDA",
