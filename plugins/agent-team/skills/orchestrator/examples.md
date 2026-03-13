@@ -33,31 +33,22 @@ Write: .agent-team/issues.md（空ファイル）
 Write: .agent-team/decisions.md（空ファイル）
 ```
 
-**Leader（課題分析・編成案作成）:**
+**Leader（課題分析・編成案作成・即実行）:**
 
-課題を分析します。セッション管理バグの調査・修正は以下の流れが最適です：
-- アナリストが根本原因を特定し、バグフィクサーが修正する逐次フロー
-- 修正後は Red-Team が妥当性検証、QA-Manager が最終確認
+課題を分析します。4 名チームで対応します（6 名以下のため承認待ちなしで即実行）。
 
-**Leader（ユーザーへ提示）:**
+**チーム編成（4 名）**
 
-以下のチーム編成を提案します。
+| 役割 | ミッション | 実行順 | 自律性レベル | mode |
+|---|---|---|---|---|
+| アナリスト | セッション無効化の根本原因を特定する | 1番目 | L1 | `"auto"` |
+| バグフィクサー | 特定された根本原因を修正する | 2番目（アナリスト完了後） | L1 | `"bypassPermissions"` |
+| Red-Team | 修正の妥当性・副作用・セキュリティリスクを批判的に検証する | 3番目 | L1 | `"auto"` |
+| QA-Manager | 初期要件の達成を確認し最終レポートを作成する | 4番目 | L1 | `"auto"` |
 
-**チーム編成案（4 名）**
+アナリストを起動し、調査を開始します。
 
-| 役割 | ミッション | 実行順 | 自律性レベル |
-|---|---|---|---|
-| アナリスト | セッション無効化の根本原因を特定する | 1番目 | L1 |
-| バグフィクサー | 特定された根本原因を修正する | 2番目（アナリスト完了後） | L1 |
-| Red-Team | 修正の妥当性・副作用・セキュリティリスクを批判的に検証する | 3番目 | L1 |
-| QA-Manager | 初期要件の達成を確認し最終レポートを作成する | 4番目 | L1 |
-
-承認いただけますか？
-
-**ユーザー:**
-> 進めてください。
-
-**Leader（初期チームメイトを起動）:**
+**Leader（チームメイトを起動）:**
 
 ```
 // Step 1: アナリストを起動
@@ -65,6 +56,7 @@ Task(
   subagent_type="Explore",
   team_name="session-bug-fix",
   name="analyst",
+  mode="auto",
   prompt="""
   # Mission
   セッション管理に関連するコードを調査し、ログイン時にセッションが稀に無効になる
@@ -95,6 +87,7 @@ Task(
   subagent_type="general-purpose",
   team_name="session-bug-fix",
   name="bugfixer",
+  mode="bypassPermissions",
   isolation="worktree",
   prompt="""
   # Mission
@@ -121,6 +114,7 @@ Task(
   subagent_type="general-purpose",
   team_name="session-bug-fix",
   name="red-team",
+  mode="auto",
   prompt="""
   # Mission
   あなたは Red-Team として、成果物への批判的検証を行ってください。
@@ -229,25 +223,20 @@ Write: .agent-team/issues.md（空ファイル）
 Write: .agent-team/decisions.md（空ファイル）
 ```
 
-**Leader（課題分析・編成案作成）:**
+**Leader（課題分析・編成案作成・即実行）:**
 
-データ移行はスキーマ分析→スクリプト実装→検証の逐次フローが必要です。本番 DB 保護のため L2 を適用します。
+データ移行はスキーマ分析→スクリプト実装→検証の逐次フローが必要です。本番 DB 保護のため L2 を適用します。4 名チームで対応します（6 名以下のため承認待ちなしで即実行）。
 
-**Leader（ユーザーへ提示・承認取得）:**
+**チーム編成（4 名）**
 
-以下の 4 名チームを提案します。
+| 役割 | ミッション | 実行順 | 自律性レベル | mode |
+|---|---|---|---|---|
+| アナリスト | v1/v2 のスキーマ差異と移行要件を分析する | 1番目 | L1 | `"auto"` |
+| 移行エンジニア | データ移行スクリプトを実装する | 2番目（アナリスト完了後） | L2（本番 DB 保護） | `"bypassPermissions"` |
+| Red-Team | 移行スクリプトのリスクと欠陥を徹底検証する | 3番目 | L1 | `"auto"` |
+| QA-Manager | 最終確認とレポート作成 | 4番目 | L1 | `"auto"` |
 
-| 役割 | ミッション | 実行順 | 自律性レベル |
-|---|---|---|---|
-| アナリスト | v1/v2 のスキーマ差異と移行要件を分析する | 1番目 | L1 |
-| 移行エンジニア | データ移行スクリプトを実装する | 2番目（アナリスト完了後） | L2（本番 DB 保護） |
-| Red-Team | 移行スクリプトのリスクと欠陥を徹底検証する | 3番目 | L1 |
-| QA-Manager | 最終確認とレポート作成 | 4番目 | L1 |
-
-承認いただけますか？
-
-**ユーザー:**
-> 進めて。
+アナリストを起動し、スキーマ分析を開始します。
 
 **Leader（アナリストを起動）:**
 
@@ -256,6 +245,7 @@ Task(
   subagent_type="Explore",
   team_name="data-migration",
   name="analyst",
+  mode="auto",
   prompt="""
   # Mission
   v1 から v2 へのデータ移行に必要な情報を全て収集・分析してください。
@@ -314,6 +304,8 @@ Task(
   subagent_type="general-purpose",
   team_name="data-migration",
   name="data-cleaner",
+  mode="bypassPermissions",
+  isolation="worktree",
   prompt="""
   # Mission
   v1 データベースの孤立データと循環参照問題を解決し、v2 への移行を安全に行える
@@ -348,6 +340,8 @@ Task(
   subagent_type="general-purpose",
   team_name="data-migration",
   name="migration-engineer",
+  mode="bypassPermissions",
+  isolation="worktree",
   prompt="""
   # Mission
   v1 から v2 へのデータ移行スクリプトを実装してください。
