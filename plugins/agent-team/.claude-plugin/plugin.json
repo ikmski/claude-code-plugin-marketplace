@@ -1,10 +1,10 @@
 {
     "name": "agent-team",
-    "version": "0.6.0",
+    "version": "0.7.0",
     "description": "課題に応じて最適なチームを動的に編成する「チーム・オブ・チームズ」型マルチエージェントプラグイン",
     "author": {
         "name": "Masaki IKEDA",
         "email": "ikeda.masaki@gmail.com"
     },
-    "keywords": ["agent", "team", "orchestrator", "multi-agent", "task"]
+    "keywords": ["agent", "team", "team-lead", "multi-agent", "team-of-teams", "delegation", "task"]
 }
