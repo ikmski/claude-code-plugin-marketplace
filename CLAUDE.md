@@ -70,15 +70,6 @@ Provides Git-related slash commands and a skill:
 **Skills:**
 - `git-helper` - Git の日常作業（ブランチ操作、コミット作成、メッセージ整形、チェリーピック、タグ付け、PR 作成）を安全に支援するスキル。`allowed-tools: Bash(git:*), Bash(gh:*), Read, Grep, Glob` で使用ツールを制限している
 
-### utilities Plugin
-Location: `plugins/utilities/`
-
-Provides hooks for desktop notifications:
-
-**Hooks:**
-- `Notification` イベント - `notify-send` でデスクトップ通知を送信
-- `Stop` イベント（タスク完了時）- `notify-send` で「Task Completed」をデスクトップ通知
-
 ## Adding New Plugins
 
 1. Create plugin directory under `plugins/{plugin-name}/`

@@ -13,11 +13,6 @@
             "description": "Git tools for Claude Code"
         },
         {
-            "name": "utilities",
-            "source": "./plugins/utilities",
-            "description": "Utility tools for Claude Code"
-        },
-        {
             "name": "agent-team",
             "source": "./plugins/agent-team",
             "description": "Team-of-Teams style multi-agent orchestration using Task tool for dynamic team formation and parallel subagent execution"
