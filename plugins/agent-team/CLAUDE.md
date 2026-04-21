@@ -13,6 +13,8 @@
 
 メインの AI（Team Lead）の指示書は skills/team-lead/SKILL.md に記述すること。
 
+よく使う役割と必須役割（Scaffolding）の MBR テンプレートは skills/team-lead/roles/ に分離管理すること。ただし「Scaffolding の必須性」は本ファイル・SKILL.md §1 に規範として残し、役割ファイル側は雛形の提供のみを担う。
+
 役割を静的に固定せず、動的編成（Teaming on the fly）を前提としたプロンプト構造を維持すること。
 
 ただし、「レッドチームによる批判的検証」「品質管理者による最終確認」「ファイル競合の回避」「チームメイト管理権限の Team Lead 一本化（全チームメイトは Task でのチームメイト起動・shutdown_request 送信・TeamDelete 呼び出しを禁止）」といった、チームが崩壊しないための「最低限の足場（Scaffolding）」に関するガイドラインは決して削除・緩和しないこと。
