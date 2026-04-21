@@ -1,9 +1,9 @@
 {
     "name": "git-tools",
-    "description": "Git tools for Claude Code",
+    "description": "Git / GitHub の日常作業（commit / PR / review）を安全に支援する Slash Command と Skill",
     "author": {
         "name": "Masaki IKEDA",
         "email": "ikeda.masaki@gmail.com"
     },
-    "keywords": ["git"]
+    "keywords": ["git", "github", "commit", "pull-request", "review"]
 }

@@ -1,15 +1,12 @@
 ---
 name: git:commit
-description: Commit Git worktree
+description: Commit changes in the current repository
 ---
 
-git worktree 内の変更を確認して commit してください。
+現在のリポジトリの変更をコミットしてください。
 
-## ガイドライン
+1. `git status` と `git diff --staged` で変更内容を確認し、ユーザーに提示する。
+2. Conventional Commits 形式でコミットメッセージを提案する。
+3. ユーザーの承認後に `git commit` を実行する。
 
-コミット作成時は、`plugins/git-tools/skills/git-helper/reference.md` を参照し、以下に従ってください：
-- コミットメッセージ規約（Conventional Commits）に準拠する
-- 機密情報（`.env`, `.pem`, `.key`, `secrets/`, `config/` など）が含まれていないか確認する
-- `git status` と `git diff --staged` で変更内容を確認してから実行する
-- `.gitignore` の適切性を確認する
-
+規約・機密情報チェック・安全対策の詳細は `${CLAUDE_PLUGIN_ROOT}/skills/git-helper/reference.md` を参照してください。
