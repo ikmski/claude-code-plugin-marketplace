@@ -15,8 +15,7 @@ This is the **Claude Code Plugin Marketplace** repository - a marketplace for di
 plugins/                         # Directory containing individual plugins
   {plugin-name}/
     .claude-plugin/plugin.json   # Plugin metadata
-    commands/                    # Slash command definitions (markdown files)
-    skills/                      # Skill definitions (optional)
+    skills/                      # Skill definitions (slash commands are defined here)
       {skill-name}/
         SKILL.md                 # Skill definition and instructions
         reference.md             # Reference information (optional)
@@ -36,18 +35,10 @@ plugins/                         # Directory containing individual plugins
 - Metadata for individual plugins including `name`, `description`, `author`, and `keywords`
 - Must be located in the plugin's `.claude-plugin/` subdirectory
 
-### Slash Commands (`plugins/{name}/commands/[{namespace}/]{command}.md`)
-- コマンドは `commands/` 直下に置くか、任意のサブディレクトリで namespace 分類できる
-  - 直下に置いた場合: `commands/commit.md` → `/{plugin}:commit`
-  - namespace あり: `commands/ns/commit.md` → `/{plugin}:ns:commit`
-- Each command file contains:
-  - YAML frontmatter with `name` and `description`
-  - Command prompt/instructions in the body (can be in Japanese or other languages)
-  - Commands can accept arguments via `$1`, `$2`, etc.
-
 ### Skills (`plugins/{name}/skills/{skill-name}/`)
-- Skills provide specialized knowledge and workflows to extend Claude's capabilities
+- Skills provide specialized knowledge and workflows to extend Claude's capabilities. スラッシュコマンドも Skills として定義する（公式は新規プラグインで `skills/` の利用を推奨）
 - `SKILL.md` - メインのスキル定義ファイル。YAML frontmatter に `name`、`description`、`allowed-tools` を記載し、本文にガードレールや手順を記述する
+  - 引数は `$ARGUMENTS`（全引数文字列）で参照する
 - `reference.md` - 詳細なリファレンス情報（コマンド一覧、オプション説明など）
 - `examples.md` - 会話例（ユーザーとの典型的なやり取りのサンプル）
 - `SKILL.md` の `allowed-tools` でスキルが使用できるツールを制限できる（例: `Bash(git:*)`, `Read`, `Glob`）
@@ -62,37 +53,28 @@ plugins/                         # Directory containing individual plugins
 ### git Plugin
 Location: `plugins/git/`
 
-Provides Git-related slash commands and a skill:
+Provides Git-related skills (invoked as slash commands):
 
-**Slash Commands:**
-- `/git:commit` - Commits changes in the git worktree (reviews changes and creates commit)
-- `/git:pr` - Creates a GitHub Pull Request from current branch (accepts base branch as `$1`, defaults to repository default branch if not specified)
-- `/git:review` - Reviews changes before commit (checks for debug code, TODO comments, security issues, code quality, etc.)
-
-**Skills:**
-- `git-helper` - Git の日常作業（ブランチ操作、コミット作成、メッセージ整形、チェリーピック、タグ付け、PR 作成）を安全に支援するスキル。`allowed-tools: Bash(git:*), Bash(gh:*), Read, Grep, Glob` で使用ツールを制限している
+- `/git:commit` - リポジトリの変更をコミットする
+- `/git:pr` - 現在のブランチを push して GitHub PullRequest を作成する（base branch を `$ARGUMENTS` で受け取る。未指定時は GitHub 上のデフォルトブランチ）
+- `/git:review` - コミット前の変更をレビューする（デバッグコード・機密情報・TODO コメント・品質問題等）
+- `/git:helper` - Git の日常作業（ブランチ操作、コミット、メッセージ整形、チェリーピック、タグ付け、PR 作成）を安全に支援する汎用スキル。自然言語トリガーでも発火する
 
 ## Adding New Plugins
 
 1. Create plugin directory under `plugins/{plugin-name}/`
 2. Add plugin metadata in `plugins/{plugin-name}/.claude-plugin/plugin.json`
-3. Add slash commands as markdown files in `plugins/{plugin-name}/commands/`（必要なら `commands/{namespace}/` サブディレクトリで分類）
-4. (Optional) Add skills in `plugins/{plugin-name}/skills/{skill-name}/SKILL.md`
-5. (Optional) Add hooks in `plugins/{plugin-name}/hooks/hooks.json`
-6. Register plugin in `.claude-plugin/marketplace.json`
+3. Add skills (slash commands) in `plugins/{plugin-name}/skills/{skill-name}/SKILL.md`
+4. (Optional) Add hooks in `plugins/{plugin-name}/hooks/hooks.json`
+5. Register plugin in `.claude-plugin/marketplace.json`
 
-## Command Naming Convention
+## Skill Naming Convention
 
-Slash commands follow the pattern: `/{plugin-name}:[{namespace}:]{command}` — namespace は任意。
+Skills are always namespaced as `/{plugin-name}:{skill-name}` — ディレクトリ名がそのままスキル名になる。
 
-Example (namespace なし): `/git:commit` where:
+Example: `/git:commit` where:
 - `git` = plugin name
-- `commit` = command name (filename without .md, in `commands/` directly)
-
-Example (namespace あり): `/foo:bar:baz` where:
-- `foo` = plugin name
-- `bar` = namespace (subdirectory under `commands/`)
-- `baz` = command name (filename without .md)
+- `commit` = skill name (directory under `skills/`, `SKILL.md` を内包)
 
 ## Development Notes
 

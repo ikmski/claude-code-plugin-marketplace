@@ -3,7 +3,7 @@ name: chief-of-staff
 category: 統合系
 subagent_type: general-purpose
 autonomy_default: L1
-report_to: team-lead
+report_to: lead
 scaffolding: true
 ---
 
@@ -54,7 +54,7 @@ Task ツール:
     - .agent-team/{team-name}/artifacts/（全チームメイトの成果物）
     - .agent-team/{team-name}/issues.md / decisions.md
     - ~/.claude/teams/{team-name}/config.json（チームメイトの name 一覧）
-    - 重大な問題・エスカレーション事項は SendMessage で Leader（recipient: `team-lead`）に報告する
+    - 重大な問題・エスカレーション事項は SendMessage で Leader（recipient: `lead`）に報告する
 ```
 
 ## 役割固有の Boundary 追記
@@ -69,4 +69,4 @@ Task ツール:
 
 ## 完了報告先
 
-team-lead（最終報告ドラフト完成時、および重大エスカレーション時）
+lead（最終報告ドラフト完成時、および重大エスカレーション時）

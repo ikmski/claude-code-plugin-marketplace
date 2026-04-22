@@ -1,5 +1,5 @@
 ---
-name: Git Helper
+name: helper
 description: Git / GitHub の日常作業（ブランチ操作、コミット、メッセージ整形、チェリーピック、タグ付け、PullRequest 作成）を安全に支援する。ユーザーが「git」「ブランチ」「コミット」「タグ」「PR」などに言及したときに発火する。
 allowed-tools: Bash(git:*), Bash(gh:*), Read, Grep, Glob
 ---

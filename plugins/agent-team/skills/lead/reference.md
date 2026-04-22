@@ -112,7 +112,7 @@ TeamDelete（パラメータ不要）
 }
 ```
 
-`SendMessage` での通信は `name` を使用します（agentId ではなく）。Leader への通信時の `recipient` は `team-lead` です。
+`SendMessage` での通信は `name` を使用します（agentId ではなく）。Leader への通信時の `recipient` は `lead` です。
 
 ---
 
@@ -261,7 +261,7 @@ Leader が作成・管理します。
 # チーム編成
 
 ## Team Lead
-あなた（team-lead）: 課題分析・チーム編成・チームメイト起動・戦略判断・最終報告レビュー・提出
+あなた（lead）: 課題分析・チーム編成・チームメイト起動・戦略判断・最終報告レビュー・提出
 
 ## チームメイト一覧
 
@@ -294,7 +294,7 @@ Leader が作成・管理します。
 
 ## MBR プロンプトリファレンス
 
-> MBR（Mission-Boundary-Resources）の本体テンプレートは SKILL.md Section 3 を参照。役割ごとの具体テンプレートは `skills/team-lead/roles/` を参照（必須役割は `roles/scaffolding/`、よく使う役割は `roles/common/` 配下）。
+> MBR（Mission-Boundary-Resources）の本体テンプレートは SKILL.md Section 3 を参照。役割ごとの具体テンプレートは `skills/lead/roles/` を参照（必須役割は `roles/scaffolding/`、よく使う役割は `roles/common/` 配下）。
 
 ### 良い例・悪い例
 

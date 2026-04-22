@@ -11,9 +11,9 @@
 ## 開発時のルール
 プラグインのマニフェストは .claude-plugin/plugin.json に配置すること。
 
-メインの AI（Team Lead）の指示書は skills/team-lead/SKILL.md に記述すること。
+メインの AI（Team Lead）の指示書は skills/lead/SKILL.md に記述すること。
 
-よく使う役割と必須役割（Scaffolding）の MBR テンプレートは skills/team-lead/roles/ に分離管理すること。ただし「Scaffolding の必須性」は本ファイル・SKILL.md §1 に規範として残し、役割ファイル側は雛形の提供のみを担う。
+よく使う役割と必須役割（Scaffolding）の MBR テンプレートは skills/lead/roles/ に分離管理すること。ただし「Scaffolding の必須性」は本ファイル・SKILL.md §1 に規範として残し、役割ファイル側は雛形の提供のみを担う。
 
 役割を静的に固定せず、動的編成（Teaming on the fly）を前提としたプロンプト構造を維持すること。
 

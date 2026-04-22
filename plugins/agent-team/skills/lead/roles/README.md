@@ -22,7 +22,7 @@
 | `category` | `実装系` / `調査系` / `統合系` | `../SKILL.md` §1.B の表から `isolation` / `mode` / 書き込み範囲を導出 |
 | `subagent_type` | `general-purpose` / `Explore` / `Plan` / `Bash` | Task ツール起動時の種別 |
 | `autonomy_default` | `L1` / `L2` / `L3` | デフォルト自律性レベル（`../SKILL.md` §5） |
-| `report_to` | `chief-of-staff` または `team-lead` | 完了報告先（小規模チームで CoS 省略時は team-lead） |
+| `report_to` | `chief-of-staff` または `lead` | 完了報告先（小規模チームで CoS 省略時は lead） |
 | `scaffolding` | `true` / `false` | 必須役割フラグ（`scaffolding/` 配下は true） |
 
 ## category から導出される標準値

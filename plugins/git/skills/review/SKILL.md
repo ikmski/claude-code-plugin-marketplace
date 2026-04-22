@@ -1,6 +1,10 @@
 ---
 name: review
-description: Review changes before commit
+description: コミット前の変更をレビューし、デバッグ残存・機密情報・品質問題を検出する。ユーザーが「レビュー」「review」「差分確認」と指示したときに発火する。
+allowed-tools:
+  - Bash(git:*)
+  - Read
+  - Grep
 ---
 
 現在のリポジトリの変更を、以下の観点でレビューしてください。
@@ -21,7 +25,7 @@ description: Review changes before commit
 4. **機密情報・セキュリティ**
    - API キー、トークン、パスワード、DB 接続文字列等のハードコード
    - `.env` / 鍵ファイル / 認証設定ファイルの混入
-   - 検出対象と対応手順の詳細は `${CLAUDE_PLUGIN_ROOT}/skills/git-helper/reference.md` §3 を参照
+   - 検出対象と対応手順の詳細は `${CLAUDE_PLUGIN_ROOT}/skills/helper/reference.md` §3 を参照
 
 5. **変更内容の整合性**
    - 変更の目的と実際の差分が一致しているか

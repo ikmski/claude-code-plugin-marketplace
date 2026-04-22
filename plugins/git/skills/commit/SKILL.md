@@ -1,6 +1,9 @@
 ---
 name: commit
-description: Commit changes in the current repository
+description: リポジトリの変更をコミットする。ユーザーが「コミット」「commit」と指示したときに発火する。
+allowed-tools:
+  - Bash(git:*)
+  - Read
 ---
 
 現在のリポジトリの変更をコミットしてください。
@@ -9,4 +12,4 @@ description: Commit changes in the current repository
 2. Conventional Commits 形式でコミットメッセージを提案する。
 3. ユーザーの承認後に `git commit` を実行する。
 
-規約・機密情報チェック・安全対策の詳細は `${CLAUDE_PLUGIN_ROOT}/skills/git-helper/reference.md` を参照してください。
+規約・機密情報チェック・安全対策の詳細は `${CLAUDE_PLUGIN_ROOT}/skills/helper/reference.md` を参照してください。

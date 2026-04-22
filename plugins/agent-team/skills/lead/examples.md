@@ -98,7 +98,7 @@ CoS:
   - 全 artifacts/ 読み込み → summary.md 作成
   - git worktree list → git merge --no-ff bugfixer-branch-abc123（コンフリクトなしのため自律実行）
   - final-report-draft.md 作成
-  - SendMessage to team-lead: "統合完了。マージハッシュ a1b2c3d。ドラフトレビューをお願いします"
+  - SendMessage to lead: "統合完了。マージハッシュ a1b2c3d。ドラフトレビューをお願いします"
 ```
 
 **Step 6: Leader がレビュー・クリーンアップ・最終報告**
@@ -171,7 +171,7 @@ Write: context.md / issues.md / decisions.md
 
 **（CoS がスコープ変更と判断 → Leader にエスカレーション）:**
 
-CoS → Leader（team-lead）:
+CoS → Leader（lead）:
 > 「アナリストから循環参照・孤立データ問題を報告受領。スコープ変更（data-cleaner 追加）が必要と判断。起動の可否を判断してください」
 
 ---
@@ -222,7 +222,7 @@ CoS:
   - git merge --no-ff data-cleaner-branch-xxx
   - git merge --no-ff migration-engineer-branch-yyy
   - final-report-draft.md 作成
-  - SendMessage to team-lead: "統合完了。ドラフトレビューをお願いします"
+  - SendMessage to lead: "統合完了。ドラフトレビューをお願いします"
 ```
 
 ---
