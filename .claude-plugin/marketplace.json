@@ -10,12 +10,12 @@
         {
             "name": "git",
             "source": "./plugins/git",
-            "description": "Git tools for Claude Code"
+            "description": "Git / GitHub の日常作業（commit / PR / review）を安全に支援するスラッシュコマンド群"
         },
         {
             "name": "agent-team",
             "source": "./plugins/agent-team",
-            "description": "Team-of-Teams style multi-agent plugin. A Team Lead coordinates through a Chief of Staff to delegate research, implementation, and review across dynamically formed teams."
+            "description": "課題に応じて最適なチームを動的に編成する「チーム・オブ・チームズ」型マルチエージェントプラグイン"
         }
     ]
 }

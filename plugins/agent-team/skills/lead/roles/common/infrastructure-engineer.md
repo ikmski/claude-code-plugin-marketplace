@@ -41,8 +41,8 @@ scaffolding: false
 ## 典型的な依存関係
 
 - 先行: architect（設計に基づく実装の場合）
-- 後続: Red-Team、QA-Manager
-- 並列: 他ドメインエンジニア
+- 後続: Red-Team（実装完了後の検証）
+- 並列: backend-engineer、frontend-engineer、database-engineer（独立領域なら並列実行可）
 
 ## 完了報告先
 

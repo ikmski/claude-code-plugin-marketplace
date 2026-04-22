@@ -1,10 +1,13 @@
 ---
 name: helper
 description: Git / GitHub の日常作業（ブランチ操作、コミット、メッセージ整形、チェリーピック、タグ付け、PullRequest 作成）を安全に支援する。ユーザーが「git」「ブランチ」「コミット」「タグ」「PR」などに言及したときに発火する。
-allowed-tools: Bash(git:*), Bash(gh:*), Read, Grep, Glob
+allowed-tools:
+  - Bash(git:*)
+  - Bash(gh:*)
+  - Read
+  - Grep
+  - Glob
 ---
-
-# Git Helper
 
 Git 操作を行う前にこの Skill のガードレールに従い、詳細な規約は `reference.md` を、典型的な会話フローは `examples.md` を参照する。
 

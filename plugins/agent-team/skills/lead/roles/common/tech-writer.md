@@ -24,8 +24,9 @@ scaffolding: false
 ## 役割固有の Boundary 追記
 
 - 標準 Boundary（`../../SKILL.md` §1.C）適用
-- プロジェクトソースコードは Read 専用（ドキュメント以外の実装変更禁止）
-- ドキュメント更新はコード変更を伴わない範囲に限定（必要なら Markdown / README のみ worktree で編集）
+- プロジェクトソースコードは Read 専用（コード変更禁止）
+- 成果物は `artifacts/tech-writer/` に出力する（ドラフト・新規ドキュメント草稿）
+- 既存プロジェクトドキュメント（`README.md` / `docs/` 等）を直接更新する必要がある場合は、Leader が本ロールを **実装系として** 再起動する（`isolation: "worktree"` 付与、category 実装系で書き込み範囲を worktree に拡張）
 
 ## 推奨 Resources
 

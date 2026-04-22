@@ -60,6 +60,16 @@ Provides Git-related skills (invoked as slash commands):
 - `/git:review` - コミット前の変更をレビューする（デバッグコード・機密情報・TODO コメント・品質問題等）
 - `/git:helper` - Git の日常作業（ブランチ操作、コミット、メッセージ整形、チェリーピック、タグ付け、PR 作成）を安全に支援する汎用スキル。自然言語トリガーでも発火する
 
+### agent-team Plugin
+Location: `plugins/agent-team/`
+
+課題に応じて最適なチーム（Team Lead 1 名＋チームメイト最大 9 名＝総勢最大 10 名）を動的に編成する「チーム・オブ・チームズ」型マルチエージェントプラグイン。
+
+- `/agent-team:lead` - Team Lead として課題分析・チーム編成・チームメイト起動・戦略判断・最終報告を行う
+- `skills/lead/SKILL.md` が Team Lead のプロトコル本体。`reference.md` が Agent Teams API・テンプレート・チーム構成パターンのリファレンス、`examples.md` が会話例
+- `skills/lead/roles/scaffolding/` に必須役割（Chief of Staff / Red-Team / QA-Manager）、`skills/lead/roles/common/` によく使う動的選択候補（backend / frontend / database / infrastructure / researcher / analyst / architect / tech-writer）を配置
+- チーム作業は `.agent-team/{team-name}/` 配下の共有ワークスペース（`context.md` / `team-roster.md` / `issues.md` / `decisions.md` / `artifacts/`）で進行する
+
 ## Adding New Plugins
 
 1. Create plugin directory under `plugins/{plugin-name}/`

@@ -23,13 +23,35 @@ Red-Team の全指摘クリア後に、Leader が起動する（`../../SKILL.md`
 
 ## MBR テンプレート
 
-QA-Manager 専用の MBR テンプレートは現時点では定義しない（本ファイルは別ファイル化のスコープを「既存定義の移行」に限定するため、新規スケルトンの創作は行わない）。起動時は以下を組み合わせる：
+```
+Task ツール:
+  subagent_type: "general-purpose"
+  team_name: "{チーム名}"
+  name: "qa-manager"
+  mode: "bypassPermissions"
+  prompt: |
+    # Mission
+    あなたは QA-Manager として、チームの最終成果物が初期要件を満たしているかを確認し、
+    最終評価レポートを作成してください。
 
-- ベース: `../../SKILL.md` §3「調査系テンプレート」
-- Mission: 「要件充足確認・Red-Team 指摘の対応確認・最終評価レポート作成」を明示
-- Boundary: 書き込みは `artifacts/qa-manager/` のみ、プロジェクトソースコードは Read 専用（標準 Boundary §1.C 適用）
-- Resources: 初期要件（`context.md`）、全チームメイトの `artifacts/`、Red-Team の `review-round-N.md`
-- 完了後、SendMessage で chief-of-staff に最終評価レポートを通知
+    ## 担当範囲
+    1. 初期要件（context.md）との照合: 要件充足の有無をチェック
+    2. Red-Team 指摘の対応確認: review-round-N.md の全指摘が解消されているかを検証
+    3. 残課題・推奨アクションの整理
+    4. 最終評価レポート（artifacts/qa-manager/final-report.md）の作成
+
+    # Boundary
+    - 書き込みは .agent-team/{team-name}/artifacts/qa-manager/ のみ
+    - プロジェクトソースコードの変更禁止（Read 専用）
+    - 標準 Boundary（SKILL.md §1.C）を適用
+
+    # Resources
+    - .agent-team/{team-name}/context.md（初期要件・最初に読む）
+    - .agent-team/{team-name}/artifacts/（全チームメイトの成果物）
+    - .agent-team/{team-name}/artifacts/red-team/review-round-N.md（指摘と解消履歴）
+    - .agent-team/{team-name}/issues.md / decisions.md
+    - Mission 完了後、SendMessage で Chief of Staff に最終評価レポートを通知
+```
 
 ## 役割固有の Boundary 追記
 
