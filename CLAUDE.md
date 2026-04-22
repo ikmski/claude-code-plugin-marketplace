@@ -36,8 +36,10 @@ plugins/                         # Directory containing individual plugins
 - Metadata for individual plugins including `name`, `description`, `author`, and `keywords`
 - Must be located in the plugin's `.claude-plugin/` subdirectory
 
-### Slash Commands (`plugins/{name}/commands/{namespace}/{command}.md`)
-- Commands are organized by namespace (e.g., `git/commit.md` creates `/git:commit`)
+### Slash Commands (`plugins/{name}/commands/[{namespace}/]{command}.md`)
+- コマンドは `commands/` 直下に置くか、任意のサブディレクトリで namespace 分類できる
+  - 直下に置いた場合: `commands/commit.md` → `/{plugin}:commit`
+  - namespace あり: `commands/ns/commit.md` → `/{plugin}:ns:commit`
 - Each command file contains:
   - YAML frontmatter with `name` and `description`
   - Command prompt/instructions in the body (can be in Japanese or other languages)
@@ -57,15 +59,15 @@ plugins/                         # Directory containing individual plugins
 
 ## Current Plugins
 
-### git-tools Plugin
-Location: `plugins/git-tools/`
+### git Plugin
+Location: `plugins/git/`
 
 Provides Git-related slash commands and a skill:
 
 **Slash Commands:**
-- `/git-tools:git:commit` - Commits changes in the git worktree (reviews changes and creates commit)
-- `/git-tools:git:pr` - Creates a GitHub Pull Request from current branch (accepts base branch as `$1`, defaults to repository default branch if not specified)
-- `/git-tools:git:review` - Reviews changes before commit (checks for debug code, TODO comments, security issues, code quality, etc.)
+- `/git:commit` - Commits changes in the git worktree (reviews changes and creates commit)
+- `/git:pr` - Creates a GitHub Pull Request from current branch (accepts base branch as `$1`, defaults to repository default branch if not specified)
+- `/git:review` - Reviews changes before commit (checks for debug code, TODO comments, security issues, code quality, etc.)
 
 **Skills:**
 - `git-helper` - Git の日常作業（ブランチ操作、コミット作成、メッセージ整形、チェリーピック、タグ付け、PR 作成）を安全に支援するスキル。`allowed-tools: Bash(git:*), Bash(gh:*), Read, Grep, Glob` で使用ツールを制限している
@@ -74,19 +76,23 @@ Provides Git-related slash commands and a skill:
 
 1. Create plugin directory under `plugins/{plugin-name}/`
 2. Add plugin metadata in `plugins/{plugin-name}/.claude-plugin/plugin.json`
-3. Add slash commands as markdown files in `plugins/{plugin-name}/commands/{namespace}/`
+3. Add slash commands as markdown files in `plugins/{plugin-name}/commands/`（必要なら `commands/{namespace}/` サブディレクトリで分類）
 4. (Optional) Add skills in `plugins/{plugin-name}/skills/{skill-name}/SKILL.md`
 5. (Optional) Add hooks in `plugins/{plugin-name}/hooks/hooks.json`
 6. Register plugin in `.claude-plugin/marketplace.json`
 
 ## Command Naming Convention
 
-Slash commands follow the pattern: `/{plugin-name}:{namespace}:{command}`
+Slash commands follow the pattern: `/{plugin-name}:[{namespace}:]{command}` — namespace は任意。
 
-Example: `/git-tools:git:commit` where:
-- `git-tools` = plugin name
-- `git` = namespace (subdirectory under commands/)
-- `commit` = command name (filename without .md)
+Example (namespace なし): `/git:commit` where:
+- `git` = plugin name
+- `commit` = command name (filename without .md, in `commands/` directly)
+
+Example (namespace あり): `/foo:bar:baz` where:
+- `foo` = plugin name
+- `bar` = namespace (subdirectory under `commands/`)
+- `baz` = command name (filename without .md)
 
 ## Development Notes
 

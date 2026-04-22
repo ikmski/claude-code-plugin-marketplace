@@ -1,5 +1,5 @@
 ---
-name: git:pr
+name: pr
 description: Create GitHub PullRequest
 ---
 

@@ -1,5 +1,5 @@
 ---
-name: git:review
+name: review
 description: Review changes before commit
 ---
 

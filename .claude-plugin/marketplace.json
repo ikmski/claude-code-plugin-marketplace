@@ -8,8 +8,8 @@
     },
     "plugins": [
         {
-            "name": "git-tools",
-            "source": "./plugins/git-tools",
+            "name": "git",
+            "source": "./plugins/git",
             "description": "Git tools for Claude Code"
         },
         {

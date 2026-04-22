@@ -1,5 +1,5 @@
 {
-    "name": "git-tools",
+    "name": "git",
     "description": "Git / GitHub の日常作業（commit / PR / review）を安全に支援する Slash Command と Skill",
     "author": {
         "name": "Masaki IKEDA",

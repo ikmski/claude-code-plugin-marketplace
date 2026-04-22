@@ -1,6 +1,6 @@
 # Git Helper Reference
 
-Git Helper Skill および `/git-tools:git:*` コマンドが共通で参照する規約・チェックリスト。
+Git Helper Skill および `/git:*` コマンドが共通で参照する規約・チェックリスト。
 ここを単一情報源とし、他ファイルはこの内容を繰り返さずに参照する。
 
 ## 1. ブランチ運用ポリシー
