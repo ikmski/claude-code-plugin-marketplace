@@ -1,0 +1,21 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*~
+
+# Secrets
+.env
+.env.*
+*.pem
+*.key
+
+# agent-team の作業ディレクトリ (利用側プロジェクトで生成される)
+.agent-team/
+
+# Logs
+*.log
