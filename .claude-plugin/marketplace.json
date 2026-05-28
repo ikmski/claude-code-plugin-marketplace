@@ -16,6 +16,11 @@
             "name": "agent-team",
             "source": "./plugins/agent-team",
             "description": "課題に応じて最適なチームを動的に編成する「チーム・オブ・チームズ」型マルチエージェントプラグイン"
+        },
+        {
+            "name": "lsp-extra",
+            "source": "./plugins/lsp-extra",
+            "description": "claude-plugins-official が提供していない LSP サーバ (vtsls / vue / html / json) を Claude Code から利用できるようにする"
         }
     ]
 }

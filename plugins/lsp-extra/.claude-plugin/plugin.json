@@ -1,0 +1,48 @@
+{
+    "name": "lsp-extra",
+    "version": "0.1.0",
+    "description": "claude-plugins-official が提供していない LSP サーバ (vtsls / vue / html / json) を Claude Code から利用できるようにする",
+    "author": {
+        "name": "Masaki IKEDA",
+        "email": "ikeda.masaki@gmail.com"
+    },
+    "lspServers": {
+        "vtsls": {
+            "command": "vtsls",
+            "args": ["--stdio"],
+            "extensionToLanguage": {
+                ".ts": "typescript",
+                ".tsx": "typescriptreact",
+                ".mts": "typescript",
+                ".cts": "typescript",
+                ".js": "javascript",
+                ".jsx": "javascriptreact",
+                ".mjs": "javascript",
+                ".cjs": "javascript"
+            }
+        },
+        "vue": {
+            "command": "vue-language-server",
+            "args": ["--stdio"],
+            "extensionToLanguage": {
+                ".vue": "vue"
+            }
+        },
+        "html": {
+            "command": "vscode-html-language-server",
+            "args": ["--stdio"],
+            "extensionToLanguage": {
+                ".html": "html",
+                ".htm": "html"
+            }
+        },
+        "json": {
+            "command": "vscode-json-language-server",
+            "args": ["--stdio"],
+            "extensionToLanguage": {
+                ".json": "json",
+                ".jsonc": "jsonc"
+            }
+        }
+    }
+}
