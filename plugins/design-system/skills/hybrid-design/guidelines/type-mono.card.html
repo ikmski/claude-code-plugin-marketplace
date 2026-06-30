@@ -1,0 +1,23 @@
+<!-- @dsCard group="Type" viewport="700x180" name="Mono & syntax tokens" subtitle="JetBrains Mono — code and the 8 token hues" -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<link rel="stylesheet" href="../styles.css" />
+<style>
+  body { margin: 0; background: var(--surface-sunken); padding: 18px 20px; }
+  pre { font-family: var(--font-mono); font-size: 14px; line-height: 1.6; margin: 0; }
+  .kw{color:var(--hy-purple)} .fn{color:var(--hy-blue)} .str{color:var(--hy-green)}
+  .num{color:var(--hy-orange)} .cls{color:var(--hy-yellow)} .esc{color:var(--hy-cyan)}
+  .com{color:var(--text-muted)} .pun{color:var(--text-secondary)} .fg{color:var(--text-primary)}
+</style>
+</head>
+<body>
+<pre><span class="com">// hybrid syntax token mapping</span>
+<span class="kw">export</span> <span class="kw">const</span> <span class="fn">palette</span> <span class="pun">=</span> <span class="pun">{</span>
+  <span class="fg">keyword</span><span class="pun">:</span> <span class="str">'purple'</span><span class="pun">,</span>  <span class="fg">fn</span><span class="pun">:</span> <span class="str">'blue'</span><span class="pun">,</span>   <span class="fg">str</span><span class="pun">:</span> <span class="str">'green'</span><span class="pun">,</span>
+  <span class="fg">number</span><span class="pun">:</span> <span class="num">0x09</span><span class="pun">,</span>       <span class="fg">cls</span><span class="pun">:</span> <span class="str">'yellow'</span><span class="pun">,</span> <span class="fg">esc</span><span class="pun">:</span> <span class="esc">'\n'</span><span class="pun">,</span>
+<span class="pun">}</span>
+</pre>
+</body>
+</html>

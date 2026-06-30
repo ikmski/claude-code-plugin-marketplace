@@ -1,0 +1,14 @@
+/* ==========================================================================
+   Hybrid — Webfonts
+   UI:   IBM Plex Sans  — humanist, engineered, pairs with Plex Mono
+   Code: JetBrains Mono — the canonical editor monospace
+   NOTE: served from Google Fonts CDN. To fully self-host, drop .woff2 files
+   in assets/fonts/ and repoint these src URLs. (Flagged to user.)
+   ========================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+:root {
+  --font-sans: 'IBM Plex Sans', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+}

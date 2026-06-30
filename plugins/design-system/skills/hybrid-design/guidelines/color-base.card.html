@@ -1,0 +1,31 @@
+<!-- @dsCard group="Colors" viewport="700x150" name="Base ramp" subtitle="base16 00–07 — backgrounds to foregrounds" -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<link rel="stylesheet" href="../styles.css" />
+<style>
+  body { margin: 0; background: var(--surface-canvas); padding: 18px; }
+  .ramp { display: flex; gap: 0; border-radius: var(--radius-md); overflow: hidden; border: 1px solid var(--border-default); }
+  .sw { flex: 1; height: 78px; display: flex; align-items: flex-end; padding: 7px; box-sizing: border-box; }
+  .hex { font-family: var(--font-mono); font-size: 10px; letter-spacing: .02em; }
+  .legend { display: flex; gap: 0; margin-top: 8px; }
+  .leg { flex: 1; font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); padding: 0 7px; }
+</style>
+</head>
+<body>
+  <div class="ramp">
+    <div class="sw" style="background:var(--hy-base-void)"><span class="hex" style="color:#666">#16181a</span></div>
+    <div class="sw" style="background:var(--hy-base-00)"><span class="hex" style="color:#777">#1d1f21</span></div>
+    <div class="sw" style="background:var(--hy-base-01)"><span class="hex" style="color:#888">#282a2e</span></div>
+    <div class="sw" style="background:var(--hy-base-02)"><span class="hex" style="color:#aaa">#373b41</span></div>
+    <div class="sw" style="background:var(--hy-base-03)"><span class="hex" style="color:#1d1f21">#969896</span></div>
+    <div class="sw" style="background:var(--hy-base-04)"><span class="hex" style="color:#1d1f21">#b4b7b4</span></div>
+    <div class="sw" style="background:var(--hy-base-05)"><span class="hex" style="color:#1d1f21">#c5c8c6</span></div>
+    <div class="sw" style="background:var(--hy-base-06)"><span class="hex" style="color:#1d1f21">#e0e0e0</span></div>
+  </div>
+  <div class="legend">
+    <div class="leg">void</div><div class="leg">canvas</div><div class="leg">panel</div><div class="leg">border</div><div class="leg">muted</div><div class="leg">2nd fg</div><div class="leg">fg</div><div class="leg">bright</div>
+  </div>
+</body>
+</html>

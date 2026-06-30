@@ -1,0 +1,29 @@
+<!-- @dsCard group="Spacing" viewport="700x150" name="Radius & shadow" subtitle="Small technical radii, restrained depth" -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<link rel="stylesheet" href="../styles.css" />
+<style>
+  body { margin: 0; background: var(--surface-canvas); padding: 18px 20px; display: flex; gap: 28px; align-items: center; flex-wrap: wrap; }
+  .grp { display: flex; gap: 14px; align-items: center; }
+  .box { width: 60px; height: 60px; background: var(--surface-panel); border: 1px solid var(--border-default); display: grid; place-items: end center; }
+  .lab { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); padding-bottom: 5px; }
+  .div { width: 1px; height: 70px; background: var(--border-subtle); }
+</style>
+</head>
+<body>
+  <div class="grp">
+    <div class="box" style="border-radius:2px"><span class="lab">xs·2</span></div>
+    <div class="box" style="border-radius:4px"><span class="lab">sm·4</span></div>
+    <div class="box" style="border-radius:6px"><span class="lab">md·6</span></div>
+    <div class="box" style="border-radius:10px"><span class="lab">lg·10</span></div>
+  </div>
+  <div class="div"></div>
+  <div class="grp">
+    <div class="box" style="box-shadow:var(--shadow-sm);border-radius:6px"><span class="lab">sm</span></div>
+    <div class="box" style="box-shadow:var(--shadow-md);border-radius:6px"><span class="lab">md</span></div>
+    <div class="box" style="box-shadow:var(--shadow-lg);border-radius:6px"><span class="lab">lg</span></div>
+  </div>
+</body>
+</html>

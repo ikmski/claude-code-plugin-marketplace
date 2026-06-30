@@ -1,0 +1,10 @@
+{
+    "name": "design-system",
+    "version": "0.1.0",
+    "description": "vim-hybrid カラースキームをベースとしたダーク系デザインシステム「Hybrid」。トークン・UI コンポーネント・ガイドラインを提供し、ブランド準拠の UI/成果物を生成する Skill",
+    "author": {
+        "name": "Masaki IKEDA",
+        "email": "ikeda.masaki@gmail.com"
+    },
+    "keywords": ["design-system", "ui", "hybrid", "vim-hybrid", "dark-theme", "css", "components"]
+}

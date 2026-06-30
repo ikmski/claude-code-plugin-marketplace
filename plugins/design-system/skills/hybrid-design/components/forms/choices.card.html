@@ -1,0 +1,51 @@
+<!-- @dsCard group="Components" viewport="700x230" name="Choices" subtitle="Checkbox, radio, select, textarea" -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<link rel="stylesheet" href="../../styles.css" />
+<style>
+  body { margin: 0; background: var(--surface-canvas); padding: 22px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px 28px; align-items: start; max-width: 640px; }
+  .stack { display: flex; flex-direction: column; gap: 12px; }
+  .lbl { font-family: var(--font-mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 2px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script>
+<script type="text/babel">
+  const { Checkbox, RadioGroup, Select, Textarea } = window.HybridDesignSystem_e4e0e4;
+  function Demo() {
+    const [push, setPush] = React.useState(true);
+    const [all, setAll] = React.useState(false);
+    const [strat, setStrat] = React.useState('rebase');
+    const [branch, setBranch] = React.useState('main');
+    return (
+      <div className="grid">
+        <div className="stack">
+          <div className="lbl">Checkbox</div>
+          <Checkbox checked={push} onChange={setPush} label="Run on push" />
+          <Checkbox checked={all} indeterminate={!all} onChange={setAll} label="Select all jobs" />
+          <Checkbox checked={false} disabled label="Require approval (locked)" />
+        </div>
+        <div className="stack">
+          <div className="lbl">Radio · merge strategy</div>
+          <RadioGroup
+            value={strat}
+            onChange={setStrat}
+            options={[{value:'rebase',label:'Rebase and merge'},{value:'squash',label:'Squash and merge'},{value:'commit',label:'Create a merge commit'}]}
+          />
+        </div>
+        <Select label="Branch" value={branch} onChange={e=>setBranch(e.target.value)} options={['main','develop','release/2.4','feature/auth']} />
+        <Textarea label="Commit message" rows={3} placeholder="Describe your change…" />
+      </div>
+    );
+  }
+  ReactDOM.createRoot(document.getElementById('root')).render(<Demo />);
+</script>
+</body>
+</html>

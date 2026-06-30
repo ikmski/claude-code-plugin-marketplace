@@ -70,6 +70,30 @@ Location: `plugins/agent-team/`
 - `skills/lead/roles/scaffolding/` に必須役割（Chief of Staff / Red-Team / QA-Manager）、`skills/lead/roles/common/` によく使う動的選択候補（backend / frontend / database / infrastructure / researcher / analyst / architect / tech-writer）を配置
 - チーム作業は `.agent-team/{team-name}/` 配下の共有ワークスペース（`context.md` / `team-roster.md` / `issues.md` / `decisions.md` / `artifacts/`）で進行する
 
+### lsp-extra Plugin
+Location: `plugins/lsp-extra/`
+
+claude-plugins-official が提供していない LSP サーバを Claude Code から利用できるようにするプラグイン。スキルやスラッシュコマンドは持たず、`plugin.json` の `lspServers` フィールドで LSP サーバを定義する。
+
+- 提供する LSP サーバ:
+  - `vtsls` - TypeScript / JavaScript（`.ts` / `.tsx` / `.mts` / `.cts` / `.js` / `.jsx` / `.mjs` / `.cjs`）
+  - `vue` - Vue（`.vue`）。`vue-language-server` を使用
+  - `html` - HTML（`.html` / `.htm`）。`vscode-html-language-server` を使用
+  - `json` - JSON（`.json` / `.jsonc`）。`vscode-json-language-server` を使用
+- 各サーバの実行コマンドは PATH 上に存在している必要がある（別途インストールが前提）
+
+### design-system Plugin
+Location: `plugins/design-system/`
+
+vim-hybrid（Tomorrow-Night ベース）カラースキームをベースとしたダーク系デザインシステム「Hybrid」を提供する Skill プラグイン。
+
+- `/design-system:hybrid-design` - ブランド準拠の UI / 成果物（HTML アーティファクトまたは本番コード）を生成する。`SKILL.md` の frontmatter に `user-invocable: true` を持つ
+- `skills/hybrid-design/` に Agent Skills 形式のバンドル一式を内包する:
+  - `SKILL.md`（スキル定義） / `README.md`（デザインガイド本体） / `styles.css`（トークン読み込みのエントリポイント）
+  - `tokens/`（colors / fonts / typography / spacing）、`components/`（core / forms / feedback / data の React プリミティブ）、`guidelines/`（色・余白・タイプのプレビューカード）
+  - 付随ファイル（`_ds_manifest.json` / `_ds_bundle.js` / `deck-stage.js` / `Hybrid Overview Deck.html` など）はバンドルをそのまま保持している
+- このスキルはバンドル作者の定義を verbatim で保持しており、`allowed-tools` 制約は付けない（成果物・本番コードを書くため Write を要する）
+
 ## Adding New Plugins
 
 1. Create plugin directory under `plugins/{plugin-name}/`

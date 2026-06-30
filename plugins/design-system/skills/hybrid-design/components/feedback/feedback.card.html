@@ -1,0 +1,48 @@
+<!-- @dsCard group="Components" viewport="700x320" name="Card, Callout & CodeBlock" subtitle="Panel surface, status banners, syntax-tinted code" -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<link rel="stylesheet" href="../../styles.css" />
+<style>
+  body { margin: 0; background: var(--surface-canvas); padding: 22px; }
+  .wrap { display: grid; grid-template-columns: 1fr 1.1fr; gap: 18px; align-items: start; }
+  .stack { display: flex; flex-direction: column; gap: 12px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script>
+<script type="text/babel">
+  const { Card, Callout, CodeBlock, Button } = window.HybridDesignSystem_e4e0e4;
+  function Demo() {
+    return (
+      <div className="wrap">
+        <div className="stack">
+          <Card title="deploy.yml" meta="modified 2m ago" actions={<Button size="sm" variant="ghost">edit</Button>}>
+            <div style={{fontFamily:'var(--font-sans)',fontSize:13,color:'var(--text-secondary)',lineHeight:1.5}}>
+              Workflow runs on push to <code style={{fontFamily:'var(--font-mono)',color:'var(--hy-green)'}}>main</code>. 3 jobs, ~2m avg.
+            </div>
+          </Card>
+          <Callout tone="success" title="Build passed">All 248 tests green in 41s.</Callout>
+          <Callout tone="warning">Node 16 reaches EOL soon.</Callout>
+        </div>
+        <CodeBlock filename="auth.ts" lines={[
+          [{t:'import ',c:'kw'},{t:'{ sign }',c:'pun'},{t:' from ',c:'kw'},{t:"'./jwt'",c:'str'}],
+          [{t:''}],
+          [{t:'export ',c:'kw'},{t:'async ',c:'kw'},{t:'function ',c:'kw'},{t:'login',c:'fn'},{t:'(user'},{t:': '},{t:'User',c:'cls'},{t:') {'}],
+          [{t:'  const ',c:'kw'},{t:'token'},{t:' = '},{t:'sign',c:'fn'},{t:'(user.'},{t:'id'},{t:', '},{t:'3600',c:'num'},{t:')'}],
+          [{t:'  // refresh window: 1h',c:'com'}],
+          [{t:'  return ',c:'kw'},{t:'{ token }',c:'pun'}],
+          [{t:'}'}],
+        ]} />
+      </div>
+    );
+  }
+  ReactDOM.createRoot(document.getElementById('root')).render(<Demo />);
+</script>
+</body>
+</html>

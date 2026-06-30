@@ -1,0 +1,79 @@
+/* ==========================================================================
+   Hybrid — Color tokens
+   Palette derived from w0ng/vim-hybrid (Tomorrow-Night base16 by Chris Kempson)
+   A dark, code-editor color system. Background-led, muted accents.
+   ========================================================================== */
+
+:root {
+  /* ---- Base ramp: backgrounds → foregrounds (base16 00–07) ---- */
+  --hy-base-void:    #16181a; /* deepest canvas, below base bg          */
+  --hy-base-00:      #1d1f21; /* primary background  (Normal bg)        */
+  --hy-base-01:      #282a2e; /* elevated surface / current line        */
+  --hy-base-02:      #373b41; /* selection / hairline border            */
+  --hy-base-03:      #969896; /* comments / muted text (base16 03)      */
+  --hy-base-04:      #b4b7b4; /* secondary foreground                   */
+  --hy-base-05:      #c5c8c6; /* default foreground  (Normal fg)        */
+  --hy-base-06:      #e0e0e0; /* bright foreground                      */
+  --hy-base-07:      #ffffff; /* brightest / pure white                 */
+
+  /* ---- Accent ramp (base16 08–0F) — the 8 syntax hues ---- */
+  --hy-red:     #cc6666; /* base16 08 — keywords removed / error        */
+  --hy-orange:  #de935f; /* base16 09 — numbers, constants              */
+  --hy-yellow:  #f0c674; /* base16 0A — classes, search highlight       */
+  --hy-green:   #b5bd68; /* base16 0B — strings, added                  */
+  --hy-cyan:    #8abeb7; /* base16 0C — escapes, regex, support         */
+  --hy-blue:    #81a2be; /* base16 0D — functions, headings — PRIMARY   */
+  --hy-purple:  #b294bb; /* base16 0E — keywords, storage               */
+  --hy-brown:   #a3685a; /* base16 0F — deprecated, embedded            */
+
+  /* Soft tints of accents for fills/badges (12% over base-00) */
+  --hy-red-tint:    #3a2828;
+  --hy-orange-tint: #3a3026;
+  --hy-yellow-tint: #3a372a;
+  --hy-green-tint:  #2f3528;
+  --hy-cyan-tint:   #28363a;
+  --hy-blue-tint:   #28333a;
+  --hy-purple-tint: #322e3a;
+
+  /* ============================ SEMANTIC ============================ */
+
+  /* Surfaces */
+  --surface-canvas:   var(--hy-base-00);  /* page background            */
+  --surface-sunken:   var(--hy-base-void);/* wells, code blocks, gutters*/
+  --surface-panel:    var(--hy-base-01);  /* cards, sidebars, toolbars  */
+  --surface-raised:   var(--hy-base-02);  /* popovers, menus, hover row */
+  --surface-selection:#2b4a5c;            /* text/row selection (blue)  */
+
+  /* Borders */
+  --border-subtle:    #2a2c2f;            /* faint divider              */
+  --border-default:   var(--hy-base-02);  /* standard hairline          */
+  --border-strong:    #4a4f56;            /* focused / emphasized       */
+
+  /* Text */
+  --text-primary:     var(--hy-base-05);
+  --text-bright:      var(--hy-base-06);
+  --text-strong:      var(--hy-base-07);
+  --text-secondary:   var(--hy-base-04);
+  --text-muted:       var(--hy-base-03);
+  --text-on-accent:   var(--hy-base-00);  /* dark ink on light accent   */
+
+  /* Brand accent (blue 0D) */
+  --accent:           var(--hy-blue);
+  --accent-tint:      var(--hy-blue-tint);
+  --accent-hover:     #93b1c9;            /* +lightness                 */
+  --accent-press:     #6f93b0;            /* −lightness                 */
+
+  /* Status */
+  --success:          var(--hy-green);
+  --success-tint:     var(--hy-green-tint);
+  --warning:          var(--hy-yellow);
+  --warning-tint:     var(--hy-yellow-tint);
+  --danger:           var(--hy-red);
+  --danger-tint:      var(--hy-red-tint);
+  --info:             var(--hy-cyan);
+  --info-tint:        var(--hy-cyan-tint);
+
+  /* Focus ring — offset double-ring for solid controls (buttons, toggles).
+     Sunken fields (Input) use a border + soft --accent-tint glow instead. */
+  --ring: 0 0 0 2px var(--surface-canvas), 0 0 0 4px var(--accent);
+}

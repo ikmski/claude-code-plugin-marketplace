@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Hybrid Design System — Overview</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" />
+<style>
+  html, body { margin: 0; background: #16181a; }
+  .hy-eyebrow { font-family: 'JetBrains Mono', monospace; font-size: 24px; letter-spacing: 0.14em; text-transform: uppercase; color: #969896; }
+  .hy-title { font-family: 'JetBrains Mono', monospace; font-weight: 700; color: #e0e0e0; line-height: 1.05; letter-spacing: -0.01em; }
+  .hy-sub { font-family: 'IBM Plex Sans', sans-serif; color: #b4b7b4; line-height: 1.5; }
+  .hy-mono { font-family: 'JetBrains Mono', monospace; }
+  .hy-sans { font-family: 'IBM Plex Sans', sans-serif; }
+</style>
+</head>
+<body>
+<deck-stage>
+
+<section data-label="Cover" style="width:100%;height:100%;box-sizing:border-box;background:#16181a;display:flex;flex-direction:column;justify-content:center;padding:140px 150px;position:relative;overflow:hidden;">
+  <div style="display:flex;gap:11px;margin-bottom:60px;">
+    <span style="width:18px;height:18px;border-radius:999px;background:#cc6666;opacity:.9;"></span>
+    <span style="width:18px;height:18px;border-radius:999px;background:#f0c674;opacity:.9;"></span>
+    <span style="width:18px;height:18px;border-radius:999px;background:#b5bd68;opacity:.9;"></span>
+  </div>
+  <div class="hy-eyebrow" style="margin-bottom:28px;">Design System — based on vim-hybrid</div>
+  <div class="hy-title" style="font-size:150px;">Hybrid</div>
+  <div class="hy-sub" style="font-size:34px;max-width:1050px;margin-top:34px;">A dark, code-editor UI language. Deep neutral surfaces, eight muted syntax hues, monospace-forward type, and dense, technical layouts.</div>
+  <div class="hy-mono" style="position:absolute;bottom:120px;left:150px;font-size:24px;color:#81a2be;letter-spacing:0.04em;">19 components · 107 tokens · base16 palette · MIT</div>
+  <div class="hy-mono" style="position:absolute;right:0;bottom:0;font-size:300px;line-height:1;color:#1d1f21;user-select:none;padding:0 40px 20px 0;">{ }</div>
+</section>
+
+<section data-label="Color" style="width:100%;height:100%;box-sizing:border-box;background:#1d1f21;display:flex;flex-direction:column;padding:100px 120px;">
+  <div class="hy-eyebrow" style="margin-bottom:14px;">01 — Color</div>
+  <div class="hy-title" style="font-size:64px;margin-bottom:14px;">Background-led, eight muted hues</div>
+  <div class="hy-sub" style="font-size:26px;max-width:1200px;margin-bottom:50px;">Depth comes from a neutral surface ramp — never gradients. The syntax accents are desaturated and equal-weight; <span style="color:#81a2be;font-weight:600;">blue is the primary accent</span>.</div>
+
+  <div class="hy-mono" style="font-size:20px;color:#969896;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:16px;">Base ramp</div>
+  <div style="display:flex;gap:0;margin-bottom:46px;border:1px solid #373b41;border-radius:6px;overflow:hidden;">
+    <div style="flex:1;height:120px;background:#16181a;display:flex;align-items:flex-end;padding:12px;"><span class="hy-mono" style="font-size:17px;color:#969896;">16181a</span></div>
+    <div style="flex:1;height:120px;background:#1d1f21;display:flex;align-items:flex-end;padding:12px;border-left:1px solid #282a2e;"><span class="hy-mono" style="font-size:17px;color:#969896;">1d1f21</span></div>
+    <div style="flex:1;height:120px;background:#282a2e;display:flex;align-items:flex-end;padding:12px;"><span class="hy-mono" style="font-size:17px;color:#b4b7b4;">282a2e</span></div>
+    <div style="flex:1;height:120px;background:#373b41;display:flex;align-items:flex-end;padding:12px;"><span class="hy-mono" style="font-size:17px;color:#c5c8c6;">373b41</span></div>
+    <div style="flex:1;height:120px;background:#969896;display:flex;align-items:flex-end;padding:12px;"><span class="hy-mono" style="font-size:17px;color:#1d1f21;">969896</span></div>
+    <div style="flex:1;height:120px;background:#c5c8c6;display:flex;align-items:flex-end;padding:12px;"><span class="hy-mono" style="font-size:17px;color:#1d1f21;">c5c8c6</span></div>
+    <div style="flex:1;height:120px;background:#e0e0e0;display:flex;align-items:flex-end;padding:12px;"><span class="hy-mono" style="font-size:17px;color:#1d1f21;">e0e0e0</span></div>
+  </div>
+
+  <div class="hy-mono" style="font-size:20px;color:#969896;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:16px;">Syntax hues</div>
+  <div style="display:grid;grid-template-columns:repeat(8,1fr);gap:18px;">
+    <div><div style="height:96px;border-radius:6px;background:#cc6666;"></div><div class="hy-mono" style="font-size:18px;color:#c5c8c6;margin-top:10px;">red</div><div class="hy-mono" style="font-size:15px;color:#969896;">error</div></div>
+    <div><div style="height:96px;border-radius:6px;background:#de935f;"></div><div class="hy-mono" style="font-size:18px;color:#c5c8c6;margin-top:10px;">orange</div><div class="hy-mono" style="font-size:15px;color:#969896;">numbers</div></div>
+    <div><div style="height:96px;border-radius:6px;background:#f0c674;"></div><div class="hy-mono" style="font-size:18px;color:#c5c8c6;margin-top:10px;">yellow</div><div class="hy-mono" style="font-size:15px;color:#969896;">classes</div></div>
+    <div><div style="height:96px;border-radius:6px;background:#b5bd68;"></div><div class="hy-mono" style="font-size:18px;color:#c5c8c6;margin-top:10px;">green</div><div class="hy-mono" style="font-size:15px;color:#969896;">strings</div></div>
+    <div><div style="height:96px;border-radius:6px;background:#8abeb7;"></div><div class="hy-mono" style="font-size:18px;color:#c5c8c6;margin-top:10px;">cyan</div><div class="hy-mono" style="font-size:15px;color:#969896;">escapes</div></div>
+    <div><div style="height:96px;border-radius:6px;background:#81a2be;border:2px solid #e0e0e0;"></div><div class="hy-mono" style="font-size:18px;color:#e0e0e0;margin-top:10px;">blue ◂</div><div class="hy-mono" style="font-size:15px;color:#81a2be;">primary</div></div>
+    <div><div style="height:96px;border-radius:6px;background:#b294bb;"></div><div class="hy-mono" style="font-size:18px;color:#c5c8c6;margin-top:10px;">purple</div><div class="hy-mono" style="font-size:15px;color:#969896;">keywords</div></div>
+    <div><div style="height:96px;border-radius:6px;background:#a3685a;"></div><div class="hy-mono" style="font-size:18px;color:#c5c8c6;margin-top:10px;">brown</div><div class="hy-mono" style="font-size:15px;color:#969896;">embedded</div></div>
+  </div>
+</section>
+
+<section data-label="Type" style="width:100%;height:100%;box-sizing:border-box;background:#1d1f21;display:flex;flex-direction:column;padding:100px 120px;">
+  <div class="hy-eyebrow" style="margin-bottom:14px;">02 — Type</div>
+  <div class="hy-title" style="font-size:64px;margin-bottom:50px;">Monospace-forward</div>
+  <div style="display:flex;gap:80px;flex:1;min-height:0;">
+    <div style="flex:1;display:flex;flex-direction:column;gap:40px;">
+      <div style="border:1px solid #373b41;border-radius:6px;padding:34px 38px;background:#282a2e;">
+        <div class="hy-mono" style="font-size:18px;color:#969896;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:14px;">Display / Code / UI</div>
+        <div class="hy-mono" style="font-size:52px;color:#e0e0e0;font-weight:700;">JetBrains Mono</div>
+        <div class="hy-mono" style="font-size:24px;color:#81a2be;margin-top:10px;">const ttl = 3600 // canonical editor monospace</div>
+      </div>
+      <div style="border:1px solid #373b41;border-radius:6px;padding:34px 38px;background:#282a2e;">
+        <div class="hy-mono" style="font-size:18px;color:#969896;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:14px;">Body / Prose</div>
+        <div class="hy-sans" style="font-size:52px;color:#e0e0e0;font-weight:600;">IBM Plex Sans</div>
+        <div class="hy-sans" style="font-size:24px;color:#b4b7b4;margin-top:10px;">Humanist and engineered — used for running prose and longer body copy.</div>
+      </div>
+    </div>
+    <div style="flex:1;display:flex;flex-direction:column;justify-content:center;gap:6px;">
+      <div class="hy-mono" style="font-size:18px;color:#969896;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:18px;">Scale — 1.250 major-third</div>
+      <div class="hy-mono" style="color:#e0e0e0;font-size:60px;line-height:1.1;">5xl 60</div>
+      <div class="hy-mono" style="color:#e0e0e0;font-size:46px;line-height:1.1;">4xl 46</div>
+      <div class="hy-mono" style="color:#e0e0e0;font-size:36px;line-height:1.1;">3xl 36</div>
+      <div class="hy-mono" style="color:#c5c8c6;font-size:28px;line-height:1.2;">2xl 28</div>
+      <div class="hy-mono" style="color:#c5c8c6;font-size:22px;line-height:1.2;">xl 22 · lg 18 · base 14 · sm 13 · xs 12</div>
+    </div>
+  </div>
+</section>
+
+<section data-label="Foundations" style="width:100%;height:100%;box-sizing:border-box;background:#1d1f21;display:flex;flex-direction:column;padding:100px 120px;">
+  <div class="hy-eyebrow" style="margin-bottom:14px;">03 — Foundations</div>
+  <div class="hy-title" style="font-size:64px;margin-bottom:50px;">Compact grid, technical edges</div>
+  <div style="display:grid;grid-template-columns:1.3fr 1fr;grid-template-rows:1fr 1fr;gap:40px;flex:1;min-height:0;">
+    <div style="border:1px solid #373b41;border-radius:6px;padding:32px 36px;background:#282a2e;display:flex;flex-direction:column;">
+      <div class="hy-mono" style="font-size:19px;color:#969896;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:24px;">Spacing — 4px base</div>
+      <div style="display:flex;align-items:flex-end;gap:14px;flex:1;">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:8px;"><div style="width:30px;height:16px;background:#81a2be;"></div><span class="hy-mono" style="font-size:15px;color:#969896;">4</span></div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:8px;"><div style="width:30px;height:32px;background:#81a2be;"></div><span class="hy-mono" style="font-size:15px;color:#969896;">8</span></div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:8px;"><div style="width:30px;height:48px;background:#81a2be;"></div><span class="hy-mono" style="font-size:15px;color:#969896;">12</span></div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:8px;"><div style="width:30px;height:64px;background:#81a2be;"></div><span class="hy-mono" style="font-size:15px;color:#969896;">16</span></div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:8px;"><div style="width:30px;height:96px;background:#81a2be;"></div><span class="hy-mono" style="font-size:15px;color:#969896;">24</span></div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:8px;"><div style="width:30px;height:128px;background:#81a2be;"></div><span class="hy-mono" style="font-size:15px;color:#969896;">32</span></div>
+      </div>
+    </div>
+    <div style="border:1px solid #373b41;border-radius:6px;padding:32px 36px;background:#282a2e;display:flex;flex-direction:column;">
+      <div class="hy-mono" style="font-size:19px;color:#969896;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:24px;">Radius</div>
+      <div style="display:flex;align-items:center;gap:24px;flex:1;">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:10px;"><div style="width:72px;height:72px;background:#373b41;border:1px solid #4a4f56;border-radius:2px;"></div><span class="hy-mono" style="font-size:15px;color:#969896;">2</span></div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:10px;"><div style="width:72px;height:72px;background:#373b41;border:1px solid #4a4f56;border-radius:4px;"></div><span class="hy-mono" style="font-size:15px;color:#969896;">4</span></div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:10px;"><div style="width:72px;height:72px;background:#373b41;border:1px solid #4a4f56;border-radius:6px;"></div><span class="hy-mono" style="font-size:15px;color:#969896;">6</span></div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:10px;"><div style="width:72px;height:72px;background:#373b41;border:1px solid #4a4f56;border-radius:10px;"></div><span class="hy-mono" style="font-size:15px;color:#969896;">10</span></div>
+      </div>
+    </div>
+    <div style="border:1px solid #373b41;border-radius:6px;padding:32px 36px;background:#282a2e;display:flex;flex-direction:column;">
+      <div class="hy-mono" style="font-size:19px;color:#969896;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:24px;">Shadows — dark halos</div>
+      <div style="display:flex;align-items:center;gap:34px;flex:1;">
+        <div style="width:110px;height:74px;background:#373b41;border-radius:6px;box-shadow:0 1px 2px rgba(0,0,0,0.35);"></div>
+        <div style="width:110px;height:74px;background:#373b41;border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,0.45);"></div>
+        <div style="width:110px;height:74px;background:#373b41;border-radius:6px;box-shadow:0 12px 32px rgba(0,0,0,0.55);"></div>
+      </div>
+    </div>
+    <div style="border:1px solid #373b41;border-radius:6px;padding:32px 36px;background:#282a2e;display:flex;flex-direction:column;justify-content:center;">
+      <div class="hy-mono" style="font-size:19px;color:#969896;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:20px;">Motion</div>
+      <div class="hy-mono" style="font-size:30px;color:#e0e0e0;">90 · 150 · 240ms</div>
+      <div class="hy-sans" style="font-size:22px;color:#b4b7b4;margin-top:12px;">cubic-bezier(0.2, 0, 0, 1) — quick, mechanical. No bounce, no spring.</div>
+    </div>
+  </div>
+</section>
+
+<section data-label="Core" style="width:100%;height:100%;box-sizing:border-box;background:#1d1f21;display:flex;flex-direction:column;padding:100px 120px;">
+  <div class="hy-eyebrow" style="margin-bottom:14px;">04 — Components · Core</div>
+  <div class="hy-title" style="font-size:64px;margin-bottom:50px;">Actions &amp; identity</div>
+  <div style="display:flex;flex-direction:column;gap:44px;">
+    <div>
+      <div class="hy-mono" style="font-size:19px;color:#969896;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:22px;">Buttons</div>
+      <div style="display:flex;gap:20px;align-items:center;flex-wrap:wrap;">
+        <span class="hy-mono" style="font-size:24px;font-weight:500;color:#1d1f21;background:#81a2be;border:1px solid #81a2be;border-radius:4px;padding:14px 28px;">Commit</span>
+        <span class="hy-mono" style="font-size:24px;font-weight:500;color:#1d1f21;background:#b5bd68;border:1px solid #b5bd68;border-radius:4px;padding:14px 28px;">Merge</span>
+        <span class="hy-mono" style="font-size:24px;font-weight:500;color:#1d1f21;background:#cc6666;border:1px solid #cc6666;border-radius:4px;padding:14px 28px;">Discard</span>
+        <span class="hy-mono" style="font-size:24px;font-weight:500;color:#e0e0e0;background:#373b41;border:1px solid #4a4f56;border-radius:4px;padding:14px 28px;">Secondary</span>
+        <span class="hy-mono" style="font-size:24px;font-weight:500;color:#b4b7b4;background:transparent;border:1px solid transparent;border-radius:4px;padding:14px 28px;">Ghost</span>
+      </div>
+    </div>
+    <div style="display:flex;gap:90px;flex-wrap:wrap;">
+      <div>
+        <div class="hy-mono" style="font-size:19px;color:#969896;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:22px;">Badges</div>
+        <div style="display:flex;gap:16px;align-items:center;">
+          <span class="hy-mono" style="font-size:20px;color:#b5bd68;background:#2f3528;border-radius:999px;padding:7px 16px;display:inline-flex;align-items:center;gap:9px;"><span style="width:9px;height:9px;border-radius:999px;background:#b5bd68;"></span>passed</span>
+          <span class="hy-mono" style="font-size:20px;color:#81a2be;background:#28333a;border-radius:999px;padding:7px 16px;display:inline-flex;align-items:center;gap:9px;"><span style="width:9px;height:9px;border-radius:999px;background:#81a2be;"></span>running</span>
+          <span class="hy-mono" style="font-size:20px;color:#cc6666;background:#3a2828;border-radius:999px;padding:7px 16px;display:inline-flex;align-items:center;gap:9px;"><span style="width:9px;height:9px;border-radius:999px;background:#cc6666;"></span>failed</span>
+        </div>
+      </div>
+      <div>
+        <div class="hy-mono" style="font-size:19px;color:#969896;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:22px;">Avatars</div>
+        <div style="display:flex;gap:16px;align-items:center;">
+          <span style="position:relative;width:56px;height:56px;display:inline-flex;"><span style="width:100%;height:100%;display:grid;place-items:center;border-radius:6px;background:#373b41;border:1px solid #373b41;color:#b4b7b4;font-family:'JetBrains Mono',monospace;font-size:22px;font-weight:500;">AL</span><span style="position:absolute;right:-2px;bottom:-2px;width:16px;height:16px;border-radius:999px;background:#b5bd68;border:3px solid #1d1f21;"></span></span>
+          <span style="position:relative;width:56px;height:56px;display:inline-flex;"><span style="width:100%;height:100%;display:grid;place-items:center;border-radius:6px;background:#373b41;border:1px solid #373b41;color:#b4b7b4;font-family:'JetBrains Mono',monospace;font-size:22px;font-weight:500;">GH</span><span style="position:absolute;right:-2px;bottom:-2px;width:16px;height:16px;border-radius:999px;background:#cc6666;border:3px solid #1d1f21;"></span></span>
+          <span style="position:relative;width:56px;height:56px;display:inline-flex;"><span style="width:100%;height:100%;display:grid;place-items:center;border-radius:999px;background:#373b41;border:1px solid #373b41;color:#b4b7b4;font-family:'JetBrains Mono',monospace;font-size:22px;font-weight:500;">LT</span><span style="position:absolute;right:-2px;bottom:-2px;width:16px;height:16px;border-radius:999px;background:#f0c674;border:3px solid #1d1f21;"></span></span>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="hy-mono" style="font-size:19px;color:#969896;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:22px;">Tabs</div>
+      <div style="display:flex;gap:6px;border-bottom:1px solid #373b41;">
+        <span class="hy-mono" style="font-size:24px;font-weight:500;color:#e0e0e0;padding:14px 22px;border-bottom:3px solid #81a2be;margin-bottom:-1px;">Changes <span style="color:#969896;font-size:18px;">3</span></span>
+        <span class="hy-mono" style="font-size:24px;font-weight:500;color:#969896;padding:14px 22px;">History</span>
+        <span class="hy-mono" style="font-size:24px;font-weight:500;color:#5b5d5b;padding:14px 22px;">Blame</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section data-label="Forms" style="width:100%;height:100%;box-sizing:border-box;background:#1d1f21;display:flex;flex-direction:column;padding:100px 120px;">
+  <div class="hy-eyebrow" style="margin-bottom:14px;">05 — Components · Forms</div>
+  <div class="hy-title" style="font-size:64px;margin-bottom:50px;">Sunken wells, accent focus</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:54px 90px;">
+    <div>
+      <div class="hy-mono" style="font-size:18px;color:#969896;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:12px;">Branch</div>
+      <div style="display:flex;align-items:center;height:60px;padding:0 18px;background:#16181a;border:1px solid #81a2be;border-radius:4px;box-shadow:0 0 0 4px #28333a;"><span class="hy-mono" style="font-size:24px;color:#e0e0e0;">feature/auth</span></div>
+    </div>
+    <div>
+      <div class="hy-mono" style="font-size:18px;color:#969896;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:12px;">Strategy</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;height:60px;padding:0 18px;background:#16181a;border:1px solid #373b41;border-radius:4px;"><span class="hy-mono" style="font-size:24px;color:#e0e0e0;">Rebase and merge</span><span style="color:#969896;font-size:20px;">▾</span></div>
+    </div>
+    <div>
+      <div class="hy-mono" style="font-size:18px;color:#969896;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:18px;">Checkbox · Radio</div>
+      <div style="display:flex;flex-direction:column;gap:18px;">
+        <span style="display:inline-flex;align-items:center;gap:14px;"><span style="width:26px;height:26px;border-radius:4px;background:#81a2be;display:grid;place-items:center;"><span style="color:#1d1f21;font-size:20px;font-weight:700;">✓</span></span><span class="hy-sans" style="font-size:24px;color:#c5c8c6;">Run on push</span></span>
+        <span style="display:inline-flex;align-items:center;gap:14px;"><span style="width:26px;height:26px;border-radius:999px;border:1px solid #81a2be;display:grid;place-items:center;background:#16181a;"><span style="width:12px;height:12px;border-radius:999px;background:#81a2be;"></span></span><span class="hy-sans" style="font-size:24px;color:#c5c8c6;">Squash and merge</span></span>
+      </div>
+    </div>
+    <div>
+      <div class="hy-mono" style="font-size:18px;color:#969896;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:18px;">Switch</div>
+      <div style="display:flex;align-items:center;gap:16px;">
+        <span style="width:60px;height:34px;border-radius:999px;background:#81a2be;border:1px solid #81a2be;position:relative;display:inline-block;"><span style="position:absolute;top:3px;right:3px;width:26px;height:26px;border-radius:999px;background:#e0e0e0;"></span></span>
+        <span class="hy-sans" style="font-size:24px;color:#c5c8c6;">Format on save</span>
+      </div>
+    </div>
+  </div>
+  <div style="margin-top:46px;">
+    <div class="hy-mono" style="font-size:18px;color:#969896;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:12px;">Commit message</div>
+    <div style="background:#16181a;border:1px solid #373b41;border-radius:4px;padding:18px 20px;height:120px;"><span class="hy-mono" style="font-size:23px;color:#c5c8c6;">feat(auth): stateless JWT verify, 1h refresh window</span></div>
+  </div>
+</section>
+
+<section data-label="Feedback" style="width:100%;height:100%;box-sizing:border-box;background:#1d1f21;display:flex;flex-direction:column;padding:100px 120px;">
+  <div class="hy-eyebrow" style="margin-bottom:14px;">06 — Components · Feedback &amp; Data</div>
+  <div class="hy-title" style="font-size:64px;margin-bottom:46px;">Signals, surfaces, tables</div>
+  <div style="display:grid;grid-template-columns:1.05fr 1fr;gap:50px;flex:1;min-height:0;">
+    <div style="display:flex;flex-direction:column;gap:34px;">
+      <div style="display:flex;background:#2f3528;border-radius:6px;overflow:hidden;border:1px solid #373b41;">
+        <div style="width:8px;background:#b5bd68;"></div>
+        <div style="padding:22px 26px;"><div class="hy-mono" style="font-size:24px;color:#e0e0e0;font-weight:500;">Build passed</div><div class="hy-sans" style="font-size:21px;color:#b4b7b4;margin-top:6px;">All 248 tests green in 41s.</div></div>
+      </div>
+      <div style="border:1px solid #373b41;border-radius:8px;overflow:hidden;background:#16181a;box-shadow:0 12px 32px rgba(0,0,0,0.55);">
+        <div style="display:flex;align-items:center;gap:9px;padding:14px 18px;background:#282a2e;border-bottom:1px solid #373b41;">
+          <span style="width:13px;height:13px;border-radius:999px;background:#cc6666;"></span><span style="width:13px;height:13px;border-radius:999px;background:#f0c674;"></span><span style="width:13px;height:13px;border-radius:999px;background:#b5bd68;"></span>
+          <span class="hy-mono" style="font-size:18px;color:#969896;margin-left:10px;">auth.ts</span>
+        </div>
+        <div style="padding:20px 22px;line-height:1.7;">
+          <div class="hy-mono" style="font-size:21px;"><span style="color:#b294bb;">export</span> <span style="color:#b294bb;">async</span> <span style="color:#b294bb;">function</span> <span style="color:#81a2be;">login</span><span style="color:#b4b7b4;">(creds) {</span></div>
+          <div class="hy-mono" style="font-size:21px;color:#b4b7b4;">  <span style="color:#b294bb;">const</span> ok = <span style="color:#b294bb;">await</span> <span style="color:#81a2be;">verify</span>(creds)</div>
+          <div class="hy-mono" style="font-size:21px;color:#b4b7b4;">  <span style="color:#b294bb;">return</span> ok ? <span style="color:#81a2be;">sign</span>(id, <span style="color:#de935f;">3600</span>) : <span style="color:#b294bb;">null</span></div>
+          <div class="hy-mono" style="font-size:21px;color:#b4b7b4;">}</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:26px;">
+        <div style="flex:1;height:12px;border-radius:999px;background:#16181a;border:1px solid #373b41;overflow:hidden;"><div style="width:64%;height:100%;background:#81a2be;"></div></div>
+        <span class="hy-mono" style="font-size:22px;color:#969896;">64%</span>
+        <span style="width:38px;height:38px;border-radius:999px;border:4px solid #373b41;border-top-color:#81a2be;display:inline-block;"></span>
+      </div>
+    </div>
+    <div style="border:1px solid #373b41;border-radius:6px;overflow:hidden;align-self:start;">
+      <div style="display:grid;grid-template-columns:1.2fr 1fr 0.8fr;background:#282a2e;border-bottom:1px solid #373b41;">
+        <span class="hy-mono" style="font-size:17px;color:#969896;letter-spacing:0.08em;text-transform:uppercase;padding:16px 22px;">Job</span>
+        <span class="hy-mono" style="font-size:17px;color:#969896;letter-spacing:0.08em;text-transform:uppercase;padding:16px 22px;">Status</span>
+        <span class="hy-mono" style="font-size:17px;color:#969896;letter-spacing:0.08em;text-transform:uppercase;padding:16px 22px;text-align:right;">Time</span>
+      </div>
+      <div style="display:grid;grid-template-columns:1.2fr 1fr 0.8fr;align-items:center;"><span class="hy-mono" style="font-size:22px;color:#c5c8c6;padding:16px 22px;">build</span><span style="padding:16px 22px;"><span class="hy-mono" style="font-size:18px;color:#b5bd68;background:#2f3528;border-radius:999px;padding:5px 13px;">passed</span></span><span class="hy-mono" style="font-size:22px;color:#c5c8c6;padding:16px 22px;text-align:right;">41s</span></div>
+      <div style="display:grid;grid-template-columns:1.2fr 1fr 0.8fr;align-items:center;border-top:1px solid #2a2c2f;"><span class="hy-mono" style="font-size:22px;color:#c5c8c6;padding:16px 22px;">test</span><span style="padding:16px 22px;"><span class="hy-mono" style="font-size:18px;color:#b5bd68;background:#2f3528;border-radius:999px;padding:5px 13px;">passed</span></span><span class="hy-mono" style="font-size:22px;color:#c5c8c6;padding:16px 22px;text-align:right;">1m12s</span></div>
+      <div style="display:grid;grid-template-columns:1.2fr 1fr 0.8fr;align-items:center;border-top:1px solid #2a2c2f;"><span class="hy-mono" style="font-size:22px;color:#c5c8c6;padding:16px 22px;">lint</span><span style="padding:16px 22px;"><span class="hy-mono" style="font-size:18px;color:#81a2be;background:#28333a;border-radius:999px;padding:5px 13px;">running</span></span><span class="hy-mono" style="font-size:22px;color:#c5c8c6;padding:16px 22px;text-align:right;">—</span></div>
+      <div style="display:grid;grid-template-columns:1.2fr 1fr 0.8fr;align-items:center;border-top:1px solid #2a2c2f;"><span class="hy-mono" style="font-size:22px;color:#c5c8c6;padding:16px 22px;">deploy</span><span style="padding:16px 22px;"><span class="hy-mono" style="font-size:18px;color:#cc6666;background:#3a2828;border-radius:999px;padding:5px 13px;">failed</span></span><span class="hy-mono" style="font-size:22px;color:#c5c8c6;padding:16px 22px;text-align:right;">8s</span></div>
+    </div>
+  </div>
+</section>
+
+<section data-label="Principles" style="width:100%;height:100%;box-sizing:border-box;background:#16181a;display:flex;flex-direction:column;justify-content:center;padding:120px 150px;">
+  <div class="hy-eyebrow" style="margin-bottom:30px;">Principles</div>
+  <div class="hy-title" style="font-size:80px;margin-bottom:60px;">Build in the dark.</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:40px 80px;max-width:1400px;">
+    <div style="display:flex;gap:20px;"><span class="hy-mono" style="font-size:28px;color:#81a2be;">01</span><div><div class="hy-sans" style="font-size:30px;color:#e0e0e0;font-weight:600;">High signal, low fatigue</div><div class="hy-sans" style="font-size:22px;color:#969896;margin-top:6px;">Information density over whitespace. Dark, calm, focused.</div></div></div>
+    <div style="display:flex;gap:20px;"><span class="hy-mono" style="font-size:28px;color:#b5bd68;">02</span><div><div class="hy-sans" style="font-size:30px;color:#e0e0e0;font-weight:600;">Depth from surfaces</div><div class="hy-sans" style="font-size:22px;color:#969896;margin-top:6px;">A neutral ramp, 1px hairlines — never gradients or texture.</div></div></div>
+    <div style="display:flex;gap:20px;"><span class="hy-mono" style="font-size:28px;color:#f0c674;">03</span><div><div class="hy-sans" style="font-size:30px;color:#e0e0e0;font-weight:600;">Muted, equal-weight color</div><div class="hy-sans" style="font-size:22px;color:#969896;margin-top:6px;">Eight desaturated hues. Blue leads; none screams.</div></div></div>
+    <div style="display:flex;gap:20px;"><span class="hy-mono" style="font-size:28px;color:#b294bb;">04</span><div><div class="hy-sans" style="font-size:30px;color:#e0e0e0;font-weight:600;">Mechanical, accessible</div><div class="hy-sans" style="font-size:22px;color:#969896;margin-top:6px;">Quick motion, visible focus, ARIA on every control.</div></div></div>
+  </div>
+  <div class="hy-mono" style="font-size:22px;color:#373b41;margin-top:70px;">Hybrid Design System — based on w0ng/vim-hybrid</div>
+</section>
+
+</deck-stage>
+<script src="deck-stage.js"></script>
+</body>
+</html>

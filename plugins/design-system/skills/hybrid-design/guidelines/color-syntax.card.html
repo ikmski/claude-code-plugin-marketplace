@@ -1,0 +1,30 @@
+<!-- @dsCard group="Colors" viewport="700x170" name="Syntax accents" subtitle="base16 08–0F — the 8 syntax hues" -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<link rel="stylesheet" href="../styles.css" />
+<style>
+  body { margin: 0; background: var(--surface-canvas); padding: 18px; }
+  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .chip { border-radius: var(--radius-sm); overflow: hidden; border: 1px solid var(--border-subtle); }
+  .cap { height: 50px; }
+  .meta { background: var(--surface-panel); padding: 6px 8px; }
+  .name { font-family: var(--font-mono); font-size: 11px; color: var(--text-bright); }
+  .hex { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); }
+  .role { font-family: var(--font-sans); font-size: 10px; color: var(--text-muted); }
+</style>
+</head>
+<body>
+  <div class="grid">
+    <div class="chip"><div class="cap" style="background:var(--hy-red)"></div><div class="meta"><div class="name">red · #cc6666</div><div class="role">error / removed</div></div></div>
+    <div class="chip"><div class="cap" style="background:var(--hy-orange)"></div><div class="meta"><div class="name">orange · #de935f</div><div class="role">numbers · const</div></div></div>
+    <div class="chip"><div class="cap" style="background:var(--hy-yellow)"></div><div class="meta"><div class="name">yellow · #f0c674</div><div class="role">classes · search</div></div></div>
+    <div class="chip"><div class="cap" style="background:var(--hy-green)"></div><div class="meta"><div class="name">green · #b5bd68</div><div class="role">strings · added</div></div></div>
+    <div class="chip"><div class="cap" style="background:var(--hy-cyan)"></div><div class="meta"><div class="name">cyan · #8abeb7</div><div class="role">escapes · regex</div></div></div>
+    <div class="chip"><div class="cap" style="background:var(--hy-blue)"></div><div class="meta"><div class="name">blue · #81a2be</div><div class="role">functions — PRIMARY</div></div></div>
+    <div class="chip"><div class="cap" style="background:var(--hy-purple)"></div><div class="meta"><div class="name">purple · #b294bb</div><div class="role">keywords · storage</div></div></div>
+    <div class="chip"><div class="cap" style="background:var(--hy-brown)"></div><div class="meta"><div class="name">brown · #a3685a</div><div class="role">deprecated</div></div></div>
+  </div>
+</body>
+</html>
