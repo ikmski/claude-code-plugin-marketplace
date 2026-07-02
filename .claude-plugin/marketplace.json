@@ -26,6 +26,11 @@
             "name": "design-system",
             "source": "./plugins/design-system",
             "description": "vim-hybrid ベースのダーク系デザインシステム「Hybrid」。トークン・UI コンポーネント・ガイドラインを提供する Skill"
+        },
+        {
+            "name": "statusline",
+            "source": "./plugins/statusline",
+            "description": "Claude Code の status line をセットアップするプラグイン。バンドルされたスクリプトを ~/.claude/ に配置し settings.json を構成する"
         }
     ]
 }

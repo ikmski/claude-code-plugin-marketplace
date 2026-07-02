@@ -1,0 +1,9 @@
+{
+    "name": "statusline",
+    "description": "Claude Code の status line をセットアップするプラグイン。バンドルされたスクリプトを ~/.claude/ に配置し settings.json を構成する",
+    "author": {
+        "name": "Masaki IKEDA",
+        "email": "ikeda.masaki@gmail.com"
+    },
+    "keywords": ["statusline", "status-bar", "settings"]
+}
