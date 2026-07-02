@@ -99,9 +99,9 @@ Location: `plugins/statusline/`
 
 Claude Code の status line をセットアップするプラグイン。プラグインの `settings.json` が配布できるキーは現状 `agent` と `subagentStatusLine` のみでメインの `statusLine` は宣言的に配布できないため、「セットアップスキル方式」を採用している。
 
-- `/statusline:setup` - バンドルされた `scripts/statusline.sh` を `~/.claude/statusline.sh` へコピーし、ユーザーの `~/.claude/settings.json` に `statusLine` 設定を書き込む。`$ARGUMENTS` でカスタマイズ要望（表示項目・色など）や解除（「解除」「remove」等）を受け付ける
+- `/statusline:setup` - バンドルされた `scripts/statusline.sh` を `~/.claude/statusline.sh` へコピーし、ユーザーの `~/.claude/settings.json` に `statusLine` 設定を書き込む。`$ARGUMENTS` でカスタマイズ要望（表示項目・色など）や解除（「解除」「remove」等）を受け付ける。プラグイン更新後は再実行するとバンドル版スクリプトが再コピーされて反映される（カスタマイズ済みの場合は diff 確認あり）
 - スクリプトを安定パス（`~/.claude/`）へコピーするのは、`${CLAUDE_PLUGIN_ROOT}` がユーザー settings.json では展開されず、プラグイン更新でパスが変わるため
-- デフォルトの表示: `📁 dir |  branch | model | ctx N%`（依存なしの pure bash、jq 不要）
+- デフォルトの表示: `dir |  branch | Model: name | Context: N% | Session: Hh Mm | Tokens: N.Nk | Cost: $N.NN`（依存なしの pure bash、jq 不要。データが取れないセグメントはセパレータごと省略）
 
 ## Adding New Plugins
 
