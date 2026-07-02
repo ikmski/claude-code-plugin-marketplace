@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Claude Code status line — 依存なしの pure bash（jq 不要）
-# 表示: <dir> |  <branch> | Model: <model> | Context: <ctx>% | Session: <h>h <m>m | Tokens: <N.N>k | Cost: $<N.NN>
+# 表示: <dir> | <branch> | <model> | <ctx>% | <h>h <m>m | <tokens N.N>k | <cost N.NN>
+# 各セグメントには Nerd Font アイコンのラベルが付く（下記 i_* 変数）
 # データが取れないセグメントは（セパレータごと）表示しない
 
 input=$(cat)
@@ -41,7 +42,15 @@ if [ -n "$cwd" ]; then
     branch=$(GIT_OPTIONAL_LOCKS=0 git -C "$cwd" branch --show-current 2>/dev/null)
 fi
 
-# 配色（directory: blue bold, git branch: green bold, ラベルとセパレータ: dim）
+# Nerd Font アイコン（リテラル埋め込みだと編集時に欠落しやすいためエスケープで定義）
+i_git=$'\UE725'
+i_model=$'\UF035B'
+i_ctx=$'\UE706'
+i_session=$'\UF13AB'
+i_tokens=$'\UF02B'
+i_cost=$'\UF0114'
+
+# 配色（directory: blue bold, git branch: green bold, セパレータ: dim。アイコンは後続テキストと同色）
 c_reset=$'\033[0m'
 c_dir=$'\033[1;34m'
 c_git=$'\033[1;32m'
@@ -54,20 +63,20 @@ add() {
 }
 
 add "${c_dir}${cwd:-?}${c_reset}"
-[ -n "$branch" ] && add "${c_git} ${branch}${c_reset}"
-[ -n "$model" ] && add "${c_dim}Model:${c_reset} ${model}"
-[ -n "$ctx" ] && add "${c_dim}Context:${c_reset} ${ctx}%"
+[ -n "$branch" ] && add "${c_git}${i_git} ${branch}${c_reset}"
+[ -n "$model" ] && add "${i_model} ${model}"
+[ -n "$ctx" ] && add "${i_ctx} ${ctx}%"
 
 if [ -n "$dur_ms" ]; then
     total_min=$(( ${dur_ms%%.*} / 60000 ))
-    add "${c_dim}Session:${c_reset} $(( total_min / 60 ))h $(( total_min % 60 ))m"
+    add "${i_session} $(( total_min / 60 ))h $(( total_min % 60 ))m"
 fi
 
 if [ -n "$in_tok" ] || [ -n "$out_tok" ]; then
     total_tok=$(( ${in_tok:-0} + ${out_tok:-0} ))
-    add "${c_dim}Tokens:${c_reset} $(( total_tok / 1000 )).$(( (total_tok % 1000) / 100 ))k"
+    add "${i_tokens} $(( total_tok / 1000 )).$(( (total_tok % 1000) / 100 ))k"
 fi
 
-[ -n "$cost" ] && add "${c_dim}Cost:${c_reset} \$$(LC_NUMERIC=C printf '%.2f' "$cost")"
+[ -n "$cost" ] && add "${i_cost} \$$(LC_NUMERIC=C printf '%.2f' "$cost")"
 
 printf '%s\n' "$out"
