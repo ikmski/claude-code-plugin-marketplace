@@ -1,0 +1,10 @@
+{
+    "name": "chrome-devtools",
+    "version": "0.1.0",
+    "description": "chrome-devtools-mcp で Chrome を操作できるようにするプラグイン。WSL2（ミラーモード）から Windows 側 Chrome への接続に対応し、CDP ポート付き起動スクリプトと利用スキルを同梱する",
+    "author": {
+        "name": "Masaki IKEDA",
+        "email": "ikeda.masaki@gmail.com"
+    },
+    "keywords": ["chrome", "browser", "devtools", "mcp", "wsl"]
+}

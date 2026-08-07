@@ -103,6 +103,15 @@ Claude Code の status line をセットアップするプラグイン。プラ�
 - スクリプトを安定パス（`~/.claude/`）へコピーするのは、`${CLAUDE_PLUGIN_ROOT}` がユーザー settings.json では展開されず、プラグイン更新でパスが変わるため
 - デフォルトの表示: `dir |  branch | 󰍛 name |  N% | 󱎫 Hh Mm |  N.Nk | 󰄔 $N.NN`（ラベルは Nerd Font アイコン。依存なしの pure bash、jq 不要。データが取れないセグメントはセパレータごと省略）
 
+### chrome-devtools Plugin
+Location: `plugins/chrome-devtools/`
+
+chrome-devtools-mcp（MCP サーバ）で Chrome を操作できるようにするプラグイン。MCP は Chrome を自前で起動せず `http://127.0.0.1:9222` の CDP エンドポイントに接続する方式で、WSL2（ミラーモード）から Windows 側 Chrome を操作するケースを主対象とする（Linux ネイティブでも動作）。公式の Claude in Chrome（`claude --chrome`）がネイティブメッセージング方式のため WSL 非対応であることへの代替。
+
+- `.mcp.json` - MCP サーバ定義（`npx -y chrome-devtools-mcp@latest --browserUrl http://127.0.0.1:9222`）。プラグイン有効化で自動ロードされ、ブラウザへの実接続は最初のツール呼び出し時に行われる
+- `scripts/chrome-debug.sh` - CDP ポート付きで Chrome を起動するランチャー（冪等）。Chrome 136+ が通常プロファイルでのリモートデバッグを拒否するため、専用プロファイル `chrome-debug-profile` を使う
+- `/chrome-devtools:browse` - ブラウザ操作の入口スキル。CDP エンドポイント確保 → `new_page` から始める（`navigate_page` 直呼びは「No page selected」になる）等の手順とガードレールを定義する。「ブラウザで開いて」「スクリーンショット」等の自然言語でも発火する
+
 ## Adding New Plugins
 
 1. Create plugin directory under `plugins/{plugin-name}/`
