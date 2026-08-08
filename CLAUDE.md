@@ -101,7 +101,8 @@ Claude Code の status line をセットアップするプラグイン。プラ�
 
 - `/statusline:setup` - バンドルされた `scripts/statusline.sh` を `~/.claude/statusline.sh` へコピーし、ユーザーの `~/.claude/settings.json` に `statusLine` 設定を書き込む。`$ARGUMENTS` でカスタマイズ要望（表示項目・色など）や解除（「解除」「remove」等）を受け付ける。プラグイン更新後は再実行するとバンドル版スクリプトが再コピーされて反映される（カスタマイズ済みの場合は diff 確認あり）
 - スクリプトを安定パス（`~/.claude/`）へコピーするのは、`${CLAUDE_PLUGIN_ROOT}` がユーザー settings.json では展開されず、プラグイン更新でパスが変わるため
-- デフォルトの表示: `dir |  branch | 󰍛 name |  N% | 󱎫 Hh Mm |  N.Nk | 󰄔 $N.NN`（ラベルは Nerd Font アイコン。依存なしの pure bash、jq 不要。データが取れないセグメントはセパレータごと省略）
+- デフォルトの表示: `dir |  branch | 󰍛 name |  N% |  5h N% (2h15m) |  7d N% (3d5h) | 󱎫 Hh Mm |  N.Nk | 󰄔 $N.NN`（ラベルは Nerd Font アイコン。依存なしの pure bash、jq 不要。データが取れないセグメントはセパレータごと省略）
+- レート制限（`rate_limits.five_hour` / `.seven_day`）は context の直後に 5h / 7d を別セグメントで置く。括弧内は `resets_at` までの残り時間で、既に過ぎていれば省略する。Claude.ai サブスク（Pro/Max）のみ、かつ最初の API 応答後に届き、片方だけ欠落することもある。80% 以上のウィンドウは赤で強調する
 
 ### chrome-devtools Plugin
 Location: `plugins/chrome-devtools/`

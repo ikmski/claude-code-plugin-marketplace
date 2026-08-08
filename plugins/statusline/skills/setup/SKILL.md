@@ -44,10 +44,17 @@ Claude Code の status line をセットアップしてください。引数: $A
 4. モック JSON を stdin に流して動作確認し、出力をユーザーに提示する:
 
     ```bash
+    # (a) 5h のみ・警告色（80% 以上）・resets_at なし・context_window のネスト混在
     echo '{"model":{"display_name":"Opus"},"workspace":{"current_dir":"/home/user/project"},"cost":{"total_cost_usd":1.23,"total_duration_ms":4500000},"context_window":{"total_input_tokens":54000,"total_output_tokens":1200,"current_usage":{"input_tokens":2},"used_percentage":25},"rate_limits":{"five_hour":{"used_percentage":99}}}' | ~/.claude/statusline.sh
+    # 期待: /home/user/project | 󰍛 Opus |  25% |  5h 99% | 󱎫 1h 15m |  55.2k | 󰄔 $1.23（5h セグメントは赤・括弧なし）
+
+    # (b) 両ウィンドウ + resets_at + 小数値（四捨五入・残り時間の書式）
+    now=$(date +%s)
+    printf '{"model":{"display_name":"Opus"},"workspace":{"current_dir":"/home/user/project"},"context_window":{"used_percentage":25},"rate_limits":{"five_hour":{"used_percentage":23.5,"resets_at":%d},"seven_day":{"used_percentage":41.2,"resets_at":%d}}}' $((now+8100)) $((now+280000)) | ~/.claude/statusline.sh
+    # 期待: ... |  25% |  5h 24% (2h15m) |  7d 41% (3d5h)
     ```
 
-    実際の stdin JSON と同じく `context_window` 内のネスト（`current_usage`）と `rate_limits` 側の同名 `used_percentage` を含めてあり、抽出ロジックの退行を検出できる
+    (a) は実際の stdin JSON と同じく `context_window` 内のネスト（`current_usage`）と `rate_limits` 側の同名 `used_percentage` を含めてあり、抽出ロジックの退行を検出できる。(b) は片方のウィンドウのみ／両方ある場合の切り替え、小数丸め、残り時間の書式を検出する
 
 5. 次の案内をして終了する:
    - status line は次の描画タイミングで反映される。表示されない場合はセッションを再起動する
