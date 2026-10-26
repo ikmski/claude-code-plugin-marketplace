@@ -116,7 +116,7 @@ chrome-devtools-mcp（MCP サーバ）で Chrome を操作できるようにす�
 ### session-hub Plugin
 Location: `plugins/session-hub/`
 
-hub として使うセッションから、リポジトリごとのバックグラウンドセッション（`claude --bg`）へタスクを依頼し、状態をペインで見る mod（`hooks/hooks.json` が TypeScript の hooks モジュールを読む形式）。hub のディレクトリの project settings でだけ有効にする想定。依存する `tmux-project` / `tmux-claude-attach` は ikmski/nix-config が配る。
+hub として使うセッションから、リポジトリごとのバックグラウンドセッション（`claude --bg`）へタスクを依頼し、状態をペインで見る mod（`hooks/hooks.json` が TypeScript の hooks モジュールを読む形式）。Obsidian リポジトリの project settings で有効にする。Work ごとに hub が複数いてよい。依存する `tmux-project` / `tmux-claude-attach` は ikmski/nix-config が配る。
 
 - このプラグインだけはテストを持つ。変更後は `claude plugin validate plugins/session-hub` と `claude plugin test plugins/session-hub` を通す
 
