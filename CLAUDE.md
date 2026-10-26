@@ -113,6 +113,13 @@ chrome-devtools-mcp（MCP サーバ）で Chrome を操作できるようにす�
 - `scripts/chrome-debug.sh` - CDP ポート付きで Chrome を起動するランチャー（冪等）。Chrome 136+ が通常プロファイルでのリモートデバッグを拒否するため、専用プロファイル `chrome-debug-profile` を使う
 - `/chrome-devtools:browse` - ブラウザ操作の入口スキル。CDP エンドポイント確保 → `new_page` から始める（`navigate_page` 直呼びは「No page selected」になる）等の手順とガードレールを定義する。「ブラウザで開いて」「スクリーンショット」等の自然言語でも発火する
 
+### session-hub Plugin
+Location: `plugins/session-hub/`
+
+hub として使うセッションから、リポジトリごとのバックグラウンドセッション（`claude --bg`）へタスクを依頼し、状態をペインで見る mod（`hooks/hooks.json` が TypeScript の hooks モジュールを読む形式）。hub のディレクトリの project settings でだけ有効にする想定。依存する `tmux-project` / `tmux-claude-attach` は ikmski/nix-config が配る。
+
+- このプラグインだけはテストを持つ。変更後は `claude plugin validate plugins/session-hub` と `claude plugin test plugins/session-hub` を通す
+
 ## Adding New Plugins
 
 1. Create plugin directory under `plugins/{plugin-name}/`

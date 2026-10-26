@@ -1,0 +1,331 @@
+import { atom, read, update } from 'claude-code'
+import type { EngineInterface, Register } from 'claude-code'
+
+import type { AgentRow } from '../types'
+
+const PANE = 'hub-sessions'
+// Every poll starts a `claude agents` process, so keep it slow.
+const POLL_MS = 15_000
+
+const sessions = atom({ plugin: 'session-hub', key: 'sessions' } as const, [], {
+  shape: 'sessions-1',
+})
+const error = atom({ plugin: 'session-hub', key: 'error' } as const, '', {
+  shape: 'error-1',
+})
+
+type Repo = { name: string; path: string }
+
+// tmux-project -l prints "<mark> <name>\t<path>", <mark> "*" for a live tmux
+// session; reusing it keeps the repository roots in one place
+// (~/.config/tmux-project/roots).
+export function parseRepos(stdout: string): Repo[] {
+  return stdout
+    .split('\n')
+    .filter(line => line.includes('\t'))
+    .map(line => {
+      const [name = '', path = ''] = line.split('\t')
+      return { name: name.replace(/^[* ] /, '').trim(), path: path.trim() }
+    })
+}
+
+// Exact name, then exact path, then a unique substring of the path.
+export function resolveRepo(repos: Repo[], query: string): Repo | string {
+  const q = query.trim()
+  const exact = repos.filter(r => r.name === q || r.path === q)
+  const partial = exact.length > 0 ? exact : repos.filter(r => r.path.includes(q))
+  const [only] = partial
+  if (only && partial.length === 1) return only
+  if (partial.length === 0) return `No repository matches "${q}".`
+  return `"${q}" matches several repositories: ${partial.map(r => r.path).join(', ')}`
+}
+
+const sanitize = (s: string) => s.replace(/[.:]/g, '_')
+
+// The same rule as tmux-project and tmux-claude-attach: the directory name, or
+// <org>-<repo> when another directory's session already has it; a further
+// session of the repository adds -<label>, or -2, -3 ... when it has none or
+// the name is taken.
+export function newSessionName(repo: Repo, rows: AgentRow[], label = ''): string {
+  const [dir = '', org = ''] = repo.path.split('/').reverse()
+  const clash = rows.some(r => r.name === sanitize(dir) && r.cwd !== repo.path)
+  const base = clash ? sanitize(`${org}-${dir}`) : sanitize(dir)
+  const stem = label.trim() === '' ? base : `${base}-${sanitize(label.trim())}`
+  const taken = new Set(rows.map(r => r.name))
+  if (!taken.has(stem)) return stem
+  let n = 2
+  while (taken.has(`${stem}-${n}`)) n++
+  return `${stem}-${n}`
+}
+
+// Matched by cwd, not by name: two orgs can hold repositories of one name.
+// Running sessions first, newest first (left idle for about an hour a
+// session's process stops; only `--all` lists it, and resuming keeps its context).
+export function workersOf(rows: AgentRow[], path: string): AgentRow[] {
+  return rows
+    .filter(r => r.kind === 'background' && r.cwd === path)
+    .sort((a, b) => Number(isStopped(a)) - Number(isStopped(b)) || b.startedAt - a.startedAt)
+}
+
+export function findSession(rows: AgentRow[], name: string): AgentRow | undefined {
+  return rows
+    .filter(r => r.kind === 'background' && r.name === name)
+    .sort((a, b) => Number(isStopped(a)) - Number(isStopped(b)) || b.startedAt - a.startedAt)[0]
+}
+
+export function isStopped(row: AgentRow): boolean {
+  return row.state === 'stopped'
+}
+
+async function listRows($: EngineInterface): Promise<AgentRow[]> {
+  const ran = await $.process.run(['claude', 'agents', '--json', '--all'])
+  if (ran.exitCode !== 0) throw new Error(ran.stderr.trim() || `claude agents exited ${ran.exitCode}`)
+  return JSON.parse(ran.stdout) as AgentRow[]
+}
+
+async function listRepos($: EngineInterface): Promise<Repo[]> {
+  const ran = await $.process.run(['tmux-project', '-l'])
+  if (ran.exitCode !== 0) throw new Error(ran.stderr.trim() || 'tmux-project -l failed')
+  return parseRepos(ran.stdout)
+}
+
+async function refresh($: EngineInterface): Promise<void> {
+  let rows: AgentRow[]
+  try {
+    rows = await listRows($)
+  } catch (err) {
+    await update($, error, () => String(err))
+    return
+  }
+  const before = await read($, sessions)
+  for (const row of rows) {
+    const old = before.find(o => o.sessionId === row.sessionId)
+    const was = old && label(old)
+    if (row.kind === 'background' && was !== undefined && was !== label(row)) {
+      $.ui.toast(`${row.name}: ${was} → ${label(row)}`)
+    }
+  }
+  await update($, sessions, () => rows)
+  await update($, error, () => '')
+}
+
+function label(row: AgentRow): string {
+  return row.state ?? row.status
+}
+
+// The reply address is this session's name as it is listed now. A session
+// started from argv has no sender to reply to, so the task has to name one.
+async function hubName($: EngineInterface, rows: AgentRow[]): Promise<string | undefined> {
+  const me = await $.session.id()
+  return rows.find(r => r.sessionId === me)?.name
+}
+
+export type DispatchArgs = { task: string; repo?: string; session?: string; label?: string }
+
+// Without `session` a new session is started in `repo`; with it the task goes
+// to that session (resumed when stopped).
+export async function dispatch($: EngineInterface, args: DispatchArgs): Promise<string> {
+  const rows = await listRows($)
+  const hub = await hubName($, rows)
+  const text = hub
+    ? `${args.task}\n\n終わったら SendMessage で ${hub} へ結果を返してください。`
+    : args.task
+  const warn =
+    hub === 'hub' ? '' : `\n(hub の名前が "${hub ?? '不明'}" です。返信先を固定するには \`claude -n hub\` で起動してください)`
+
+  if (args.session) {
+    const worker = findSession(rows, args.session)
+    if (!worker) {
+      const names = rows.filter(r => r.kind === 'background').map(r => r.name)
+      return `No session named "${args.session}". Sessions: ${names.join(', ') || '(none)'}`
+    }
+    if (isStopped(worker)) {
+      const ran = await $.process.run(['claude', '--resume', worker.sessionId, '--bg', text], {
+        cwd: worker.cwd,
+      })
+      await refresh($)
+      if (ran.exitCode !== 0) return `Could not resume ${worker.name}: ${ran.stderr.trim()}`
+      return `Resumed ${worker.name} (${worker.cwd}).${warn}`
+    }
+    const sent = await $.session.send({ to: { sessionId: worker.sessionId }, text })
+    if (!sent.isDelivered) return `Not delivered to ${worker.name}: ${sent.reason}`
+    await refresh($)
+    return `Sent to ${worker.name} (${worker.cwd}).${warn}`
+  }
+
+  if (!args.repo) return 'Name a repository to start a session in, or a session to send to.'
+  const repo = resolveRepo(await listRepos($), args.repo)
+  if (typeof repo === 'string') return repo
+  const name = newSessionName(repo, rows, args.label)
+  const ran = await $.process.run(['claude', '--bg', '--name', name, text], { cwd: repo.path })
+  await refresh($)
+  if (ran.exitCode !== 0) return `Could not start a session in ${repo.path}: ${ran.stderr.trim()}`
+  return `Started ${name} in ${repo.path}. Follow up with session "${name}".${warn}`
+}
+
+async function open($: EngineInterface, query: string, sessionName?: string): Promise<string> {
+  const repo = resolveRepo(await listRepos($), query)
+  if (typeof repo === 'string') return repo
+  const attachArgs: string[] = []
+  if (sessionName) {
+    const worker = workersOf(await listRows($), repo.path).find(r => r.name === sessionName)
+    if (!worker) return `No session named "${sessionName}" in ${repo.path}.`
+    attachArgs.push('-i', worker.sessionId)
+  }
+  const project = await $.process.run(['tmux-project', repo.path])
+  if (project.exitCode !== 0) return `tmux-project failed: ${project.stderr.trim()}`
+  const ls = await $.process.run(['tmux', 'list-sessions', '-F', '#{session_name}\t#{session_path}'])
+  const session = parseRepos(ls.stdout).find(s => s.path === repo.path)?.name
+  if (!session) return `No tmux session has ${repo.path} as its directory.`
+  // The picker popup needs a client to show on: this pane's.
+  const client = (await $.process.run(['tmux', 'display-message', '-p', '#{client_name}'])).stdout.trim()
+  if (client) attachArgs.push('-c', client)
+  const attach = await $.process.run(['tmux-claude-attach', '-t', session, ...attachArgs])
+  if (attach.exitCode !== 0) return `tmux-claude-attach failed: ${attach.stderr.trim()}`
+  await refresh($)
+  return `Opened ${session} in tmux.`
+}
+
+function age(startedAt: number, now: number): string {
+  const min = Math.floor((now - startedAt) / 60_000)
+  return min < 60 ? `${min}m` : `${Math.floor(min / 60)}h${min % 60}m`
+}
+
+function short(path: string): string {
+  return path.replace(/^\/home\/[^/]+\/develop\//, '')
+}
+
+export const register: Register = on => {
+  on('session.start', async ($, e, next) => {
+    const started = await next(e)
+
+    await $.command.register({ name: 'hub', description: 'Open the hub sessions pane' })
+    await $.command.register({
+      name: 'dispatch',
+      description: 'Start a new session in a repository with a task: /dispatch [-n <label>] <repo> <task>',
+    })
+    await $.command.register({
+      name: 'send',
+      description: 'Send a task to an existing session: /send <session> <task>',
+    })
+    await $.command.register({ name: 'repos', description: 'List repositories and their sessions' })
+    await $.command.register({
+      name: 'open',
+      description: "Open a repository's tmux session and attach to a Claude session: /open <repo> [session]",
+    })
+
+    await $.tool.register({
+      name: 'hub_dispatch',
+      description:
+        'Hand a task to a background Claude Code session of a repository under ~/develop. ' +
+        'Without `session`, starts a new session in `repo` with `claude --bg` (a repository can ' +
+        'have several). With `session`, sends the task to that existing session, resuming it ' +
+        'when stopped. The task is sent with a request to reply to this hub by SendMessage. ' +
+        'hub_sessions lists the sessions and their names.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          task: { type: 'string', description: 'What the session should do' },
+          repo: {
+            type: 'string',
+            description: 'Repository name or absolute path to start a new session in',
+          },
+          session: {
+            type: 'string',
+            description: 'Name of an existing session to send to; omit to start a new one',
+          },
+          label: {
+            type: 'string',
+            description: "Short purpose for a new session's name (review → <repo>-review)",
+          },
+        },
+        required: ['task'],
+      },
+      isDeferred: false,
+    })
+    await $.tool.register({
+      name: 'hub_sessions',
+      description: 'List the active Claude Code sessions (`claude agents --json`) with repository paths.',
+      isDeferred: false,
+    })
+
+    await refresh($)
+    $.clock.every(POLL_MS, () => refresh($))
+    void $.ui.open({ id: PANE, title: 'Hub sessions' })
+
+    return started
+  })
+
+  on('tool.call', { tool: 'mcp__session-hub__hub_dispatch' }, async ($, e: any) => {
+    const text = (v: unknown) => (typeof v === 'string' && v.trim() !== '' ? v : undefined)
+    const args = { task: String(e.task ?? ''), repo: text(e.repo), session: text(e.session), label: text(e.label) }
+    return { result: await dispatch($, args) }
+  }).catch(($, e, next) => ({ deny: `session-hub: hub_dispatch failed: ${String(next.error)}` }))
+
+  on('tool.call', { tool: 'mcp__session-hub__hub_sessions' }, async $ => {
+    const rows = await listRows($)
+    await update($, sessions, () => rows)
+    // An array result is read as content blocks, so hand the rows over as text.
+    return { result: JSON.stringify(rows.map(r => ({ ...r, repo: short(r.cwd) })), null, 2) }
+  }).catch(($, e, next) => ({ deny: `session-hub: hub_sessions failed: ${String(next.error)}` }))
+
+  on('command.run', { command: 'hub' }, async $ => {
+    await $.ui.open({ id: PANE, title: 'Hub sessions' })
+    return { text: 'Hub sessions pane opened.' }
+  })
+
+  on('command.run', { command: 'dispatch' }, async ($, e) => {
+    const words = e.args.trim().split(/\s+/)
+    const label = words[0] === '-n' ? words.splice(0, 2)[1] : undefined
+    const [repo, ...rest] = words
+    const task = rest.join(' ')
+    if (!repo || !task) return { text: 'Usage: /dispatch [-n <label>] <repo> <task>' }
+    return { text: await dispatch($, { repo, task, label }) }
+  })
+
+  on('command.run', { command: 'send' }, async ($, e) => {
+    const [session, ...rest] = e.args.trim().split(/\s+/)
+    const task = rest.join(' ')
+    if (!session || !task) return { text: 'Usage: /send <session> <task>' }
+    return { text: await dispatch($, { session, task }) }
+  })
+
+  on('command.run', { command: 'open' }, async ($, e) => {
+    const [repo, session] = e.args.trim().split(/\s+/)
+    if (!repo) return { text: 'Usage: /open <repo> [session]' }
+    return { text: await open($, repo, session) }
+  })
+
+  on('command.run', { command: 'repos' }, async $ => {
+    const [repos, rows] = await Promise.all([listRepos($), listRows($)])
+    const lines = repos.map(r => {
+      const ws = workersOf(rows, r.path).map(w => `${w.name}[${label(w)}]`)
+      return ws.length === 0 ? short(r.path) : `${short(r.path)}  ${ws.join(' ')}`
+    })
+    return { text: lines.join('\n') }
+  })
+
+  on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
+    const { Box, Text } = $.ui.resolve(e)
+    const rows = (await read($, sessions)).filter(r => r.kind === 'background')
+    const err = await read($, error)
+    const now = Date.now()
+    const color = (r: AgentRow) =>
+      label(r) === 'working' ? 'yellow' : r.status === 'idle' ? 'green' : undefined
+
+    return (
+      <Box flexDirection="column">
+        {err !== '' && <Text color="red">{err}</Text>}
+        {rows.length === 0 && <Text dimColor>No background sessions.</Text>}
+        {rows.map(r => (
+          <Box flexDirection="column">
+            <Text color={color(r)} bold={!isStopped(r)} dimColor={isStopped(r)}>
+              {r.name} · {label(r)} · {age(r.startedAt, now)}
+            </Text>
+            <Text dimColor>  {short(r.cwd)}</Text>
+          </Box>
+        ))}
+      </Box>
+    )
+  })
+}
