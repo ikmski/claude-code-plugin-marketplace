@@ -120,18 +120,18 @@ async function hubName($: EngineInterface, rows: AgentRow[]): Promise<string | u
   return rows.find(r => r.sessionId === me)?.name
 }
 
-export type DispatchArgs = { task: string; repo?: string; session?: string; label?: string }
+export type DispatchArgs = { task: string; repo?: string; session?: string; label?: string; open?: boolean }
 
 // Without `session` a new session is started in `repo`; with it the task goes
-// to that session (resumed when stopped).
+// to that session (resumed when stopped). With `open` the session is then put
+// in a tmux window, as hub_open does.
 export async function dispatch($: EngineInterface, args: DispatchArgs): Promise<string> {
   const rows = await listRows($)
   const hub = await hubName($, rows)
   const text = hub
     ? `${args.task}\n\n終わったら SendMessage で ${hub} へ結果を返してください。`
     : args.task
-  const warn =
-    hub === 'hub' ? '' : `\n(hub の名前が "${hub ?? '不明'}" です。返信先を固定するには \`claude -n hub\` で起動してください)`
+  const warn = hub ? '' : '\n(このセッションの名前が取れないため、依頼文に返信先を付けていません)'
 
   if (args.session) {
     const worker = findSession(rows, args.session)
@@ -145,12 +145,12 @@ export async function dispatch($: EngineInterface, args: DispatchArgs): Promise<
       })
       await refresh($)
       if (ran.exitCode !== 0) return `Could not resume ${worker.name}: ${ran.stderr.trim()}`
-      return `Resumed ${worker.name} (${worker.cwd}).${warn}`
+      return `Resumed ${worker.name} (${worker.cwd}).${warn}${await openAfter($, args, worker.cwd, worker.sessionId)}`
     }
     const sent = await $.session.send({ to: { sessionId: worker.sessionId }, text })
     if (!sent.isDelivered) return `Not delivered to ${worker.name}: ${sent.reason}`
     await refresh($)
-    return `Sent to ${worker.name} (${worker.cwd}).${warn}`
+    return `Sent to ${worker.name} (${worker.cwd}).${warn}${await openAfter($, args, worker.cwd, worker.sessionId)}`
   }
 
   if (!args.repo) return 'Name a repository to start a session in, or a session to send to.'
@@ -160,18 +160,59 @@ export async function dispatch($: EngineInterface, args: DispatchArgs): Promise<
   const ran = await $.process.run(['claude', '--bg', '--name', name, text], { cwd: repo.path })
   await refresh($)
   if (ran.exitCode !== 0) return `Could not start a session in ${repo.path}: ${ran.stderr.trim()}`
-  return `Started ${name} in ${repo.path}. Follow up with session "${name}".${warn}`
+  if (!args.open) return `Started ${name} in ${repo.path}. Follow up with session "${name}".${warn}`
+  // `claude --bg` prints no session id, so the new session is found by its name.
+  const started = workersOf(await listRows($), repo.path).find(r => r.name === name)
+  const opened = started
+    ? await openAfter($, args, repo.path, started.sessionId)
+    : `\n(${name} がまだ一覧に無いため tmux には出していません)`
+  return `Started ${name} in ${repo.path}. Follow up with session "${name}".${warn}${opened}`
 }
 
-async function open($: EngineInterface, query: string, sessionName?: string): Promise<string> {
+async function openAfter($: EngineInterface, args: DispatchArgs, path: string, sessionId: string): Promise<string> {
+  return args.open ? `\n${await openDetached($, path, ['-i', sessionId])}` : ''
+}
+
+// The repository, and the -i argument for tmux-claude-attach when a session is named.
+async function target(
+  $: EngineInterface,
+  query: string,
+  sessionName?: string,
+): Promise<{ repo: Repo; attachArgs: string[] } | string> {
   const repo = resolveRepo(await listRepos($), query)
   if (typeof repo === 'string') return repo
-  const attachArgs: string[] = []
-  if (sessionName) {
-    const worker = workersOf(await listRows($), repo.path).find(r => r.name === sessionName)
-    if (!worker) return `No session named "${sessionName}" in ${repo.path}.`
-    attachArgs.push('-i', worker.sessionId)
-  }
+  if (!sessionName) return { repo, attachArgs: [] }
+  const worker = workersOf(await listRows($), repo.path).find(r => r.name === sessionName)
+  if (!worker) return `No session named "${sessionName}" in ${repo.path}.`
+  return { repo, attachArgs: ['-i', worker.sessionId] }
+}
+
+export type OpenArgs = { repo: string; session?: string; label?: string }
+
+// For the model: the user's screen stays where it is. Without a session the
+// window starts a new Claude session.
+export async function hubOpen($: EngineInterface, args: OpenArgs): Promise<string> {
+  const found = await target($, args.repo, args.session)
+  if (typeof found === 'string') return found
+  const attachArgs = args.session ? found.attachArgs : ['-n', ...(args.label ? [args.label] : [])]
+  return openDetached($, found.repo.path, attachArgs)
+}
+
+async function openDetached($: EngineInterface, path: string, attachArgs: string[]): Promise<string> {
+  const project = await $.process.run(['tmux-project', '-d', path])
+  if (project.exitCode !== 0) return `tmux-project failed: ${project.stderr.trim()}`
+  const session = project.stdout.trim()
+  const attach = await $.process.run(['tmux-claude-attach', '-d', '-t', session, ...attachArgs])
+  if (attach.exitCode !== 0) return `tmux-claude-attach failed: ${attach.stderr.trim()}`
+  await refresh($)
+  return `${session} の window ${attach.stdout.trim()} に出した。入るには prefix S 等で切り替える。`
+}
+
+// For /open: switches this client to the session.
+async function open($: EngineInterface, query: string, sessionName?: string): Promise<string> {
+  const found = await target($, query, sessionName)
+  if (typeof found === 'string') return found
+  const { repo, attachArgs } = found
   const project = await $.process.run(['tmux-project', repo.path])
   if (project.exitCode !== 0) return `tmux-project failed: ${project.stderr.trim()}`
   const ls = await $.process.run(['tmux', 'list-sessions', '-F', '#{session_name}\t#{session_path}'])
@@ -221,6 +262,7 @@ export const register: Register = on => {
         'Without `session`, starts a new session in `repo` with `claude --bg` (a repository can ' +
         'have several). With `session`, sends the task to that existing session, resuming it ' +
         'when stopped. The task is sent with a request to reply to this hub by SendMessage. ' +
+        'With `open`, the session is then put in a tmux window as hub_open does. ' +
         'hub_sessions lists the sessions and their names.',
       inputSchema: {
         type: 'object',
@@ -238,8 +280,36 @@ export const register: Register = on => {
             type: 'string',
             description: "Short purpose for a new session's name (review → <repo>-review)",
           },
+          open: {
+            type: 'boolean',
+            description: "Also put the session in a tmux window, without switching the user's screen",
+          },
         },
         required: ['task'],
+      },
+      isDeferred: false,
+    })
+    await $.tool.register({
+      name: 'hub_open',
+      description:
+        "Set up a repository's tmux session and a window with a Claude session in it, without " +
+        "switching the user's screen (`tmux-project -d`, then `tmux-claude-attach -d`). With " +
+        '`session`, the window attaches to that background session; without it, the window starts ' +
+        'a new Claude session named after `label`. Reports which tmux session and window to enter.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          repo: { type: 'string', description: 'Repository name or absolute path' },
+          session: {
+            type: 'string',
+            description: 'Name of a background session of the repository to attach to',
+          },
+          label: {
+            type: 'string',
+            description: 'Label for a new Claude session, used when `session` is omitted',
+          },
+        },
+        required: ['repo'],
       },
       isDeferred: false,
     })
@@ -258,9 +328,21 @@ export const register: Register = on => {
 
   on('tool.call', { tool: 'mcp__session-hub__hub_dispatch' }, async ($, e: any) => {
     const text = (v: unknown) => (typeof v === 'string' && v.trim() !== '' ? v : undefined)
-    const args = { task: String(e.task ?? ''), repo: text(e.repo), session: text(e.session), label: text(e.label) }
+    const args = {
+      task: String(e.task ?? ''),
+      repo: text(e.repo),
+      session: text(e.session),
+      label: text(e.label),
+      open: e.open === true,
+    }
     return { result: await dispatch($, args) }
   }).catch(($, e, next) => ({ deny: `session-hub: hub_dispatch failed: ${String(next.error)}` }))
+
+  on('tool.call', { tool: 'mcp__session-hub__hub_open' }, async ($, e: any) => {
+    const text = (v: unknown) => (typeof v === 'string' && v.trim() !== '' ? v : undefined)
+    const args = { repo: String(e.repo ?? ''), session: text(e.session), label: text(e.label) }
+    return { result: await hubOpen($, args) }
+  }).catch(($, e, next) => ({ deny: `session-hub: hub_open failed: ${String(next.error)}` }))
 
   on('tool.call', { tool: 'mcp__session-hub__hub_sessions' }, async $ => {
     const rows = await listRows($)
