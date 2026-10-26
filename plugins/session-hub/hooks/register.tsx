@@ -202,6 +202,7 @@ async function openDetached($: EngineInterface, path: string, attachArgs: string
   const project = await $.process.run(['tmux-project', '-d', path])
   if (project.exitCode !== 0) return `tmux-project failed: ${project.stderr.trim()}`
   const session = project.stdout.trim()
+  if (!session) return `tmux-project -d printed no session name for ${path}.`
   const attach = await $.process.run(['tmux-claude-attach', '-d', '-t', session, ...attachArgs])
   if (attach.exitCode !== 0) return `tmux-claude-attach failed: ${attach.stderr.trim()}`
   await refresh($)
