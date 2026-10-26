@@ -4,6 +4,9 @@ import type { EngineInterface, Register } from 'claude-code'
 import type { AgentRow } from '../types'
 
 const PANE = 'hub-sessions'
+// Fits "<name> · <state> · <age>" and the repository path under ~/develop
+// without taking the dock's default share from the transcript.
+const PANE_COLUMNS = 40
 // Every poll starts a `claude agents` process, so keep it slow.
 const POLL_MS = 15_000
 
@@ -228,6 +231,10 @@ async function open($: EngineInterface, query: string, sessionName?: string): Pr
   return `Opened ${session} in tmux.`
 }
 
+function openPane($: EngineInterface) {
+  return $.ui.open({ id: PANE, title: 'Hub sessions', columns: PANE_COLUMNS })
+}
+
 function age(startedAt: number, now: number): string {
   const min = Math.floor((now - startedAt) / 60_000)
   return min < 60 ? `${min}m` : `${Math.floor(min / 60)}h${min % 60}m`
@@ -241,7 +248,7 @@ export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     const started = await next(e)
 
-    await $.command.register({ name: 'hub', description: 'Open the hub sessions pane' })
+    await $.command.register({ name: 'hub', description: 'Open or close the hub sessions pane' })
     await $.command.register({
       name: 'dispatch',
       description: 'Start a new session in a repository with a task: /dispatch [-n <label>] <repo> <task>',
@@ -322,7 +329,7 @@ export const register: Register = on => {
 
     await refresh($)
     $.clock.every(POLL_MS, () => refresh($))
-    void $.ui.open({ id: PANE, title: 'Hub sessions' })
+    void openPane($)
 
     return started
   })
@@ -353,7 +360,13 @@ export const register: Register = on => {
   }).catch(($, e, next) => ({ deny: `session-hub: hub_sessions failed: ${String(next.error)}` }))
 
   on('command.run', { command: 'hub' }, async $ => {
-    await $.ui.open({ id: PANE, title: 'Hub sessions' })
+    // The pane opened at session start waits undrawn on a narrow terminal;
+    // /hub then draws it rather than closing what the person never saw.
+    if ((await $.ui.panes()).some(p => p.id === PANE && p.isPlaced)) {
+      await $.ui.close({ id: PANE })
+      return { text: 'Hub sessions pane closed.' }
+    }
+    await openPane($)
     return { text: 'Hub sessions pane opened.' }
   })
 

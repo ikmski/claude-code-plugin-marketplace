@@ -313,3 +313,45 @@ test('the pane lists background sessions with state and repository, on every sur
     await ui.unmount()
   }
 })
+
+test('/hub opens the pane narrow, and closes it when it is open', async ($, on) => {
+  const opened: any[] = []
+  const closed: any[] = []
+  let isOpen = false
+  on('ui.panes', () => ({
+    value: isOpen ? [{ id: 'hub-sessions', title: 'Hub sessions', isShown: true, isFocused: false, isPlaced: true }] : [],
+  }))
+  on('ui.open', (_: unknown, e: any) => {
+    opened.push(e)
+    isOpen = true
+    return { value: { isPlaced: true } }
+  })
+  on('ui.close', (_: unknown, e: any) => {
+    closed.push(e)
+    isOpen = false
+    return { value: undefined }
+  })
+
+  expect((await $.command.run({ command: 'hub' } as any)).text).toBe('Hub sessions pane opened.')
+  expect(opened).toEqual([{ id: 'hub-sessions', title: 'Hub sessions', columns: 40 }])
+  expect((await $.command.run({ command: 'hub' } as any)).text).toBe('Hub sessions pane closed.')
+  expect(closed.map(e => e.id)).toEqual(['hub-sessions'])
+  expect((await $.command.run({ command: 'hub' } as any)).text).toBe('Hub sessions pane opened.')
+})
+
+test('/hub draws the pane that waits undrawn instead of closing it', async ($, on) => {
+  const opened: any[] = []
+  on('ui.panes', () => ({
+    value: [{ id: 'hub-sessions', title: 'Hub sessions', isShown: true, isFocused: false, isPlaced: false }],
+  }))
+  on('ui.open', (_: unknown, e: any) => {
+    opened.push(e)
+    return { value: { isPlaced: true } }
+  })
+  on('ui.close', () => {
+    throw new Error('closed')
+  })
+
+  expect((await $.command.run({ command: 'hub' } as any)).text).toBe('Hub sessions pane opened.')
+  expect(opened.length).toBe(1)
+})
