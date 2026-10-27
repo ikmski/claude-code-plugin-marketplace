@@ -1,6 +1,6 @@
 {
     "name": "session-hub",
-    "version": "0.6.0",
+    "version": "0.8.0",
     "description": "hub セッションから、リポジトリごとの Claude Code バックグラウンドセッションへタスクを依頼し、状態をペインで見る mod",
     "author": {
         "name": "Masaki IKEDA",
