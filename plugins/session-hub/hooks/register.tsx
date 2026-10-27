@@ -307,25 +307,16 @@ function short(path: string): string {
   return path.replace(/^\/home\/[^/]+\/develop\//, '')
 }
 
+// Only what a person does by hand; the rest is asked of the hub in words,
+// which reaches the tools.
 const COMMANDS: CommandSpec[] = [
   { name: 'session-hub', description: 'Open or close the hub sessions pane' },
-  {
-    name: 'session-dispatch',
-    description: 'Start a new session in a repository with a task: /session-dispatch [-n <label>] <repo> <task>',
-  },
-  { name: 'session-send', description: 'Send a task to an existing session: /session-send <session> <task>' },
   {
     name: 'session-switch',
     description:
       "Switch the screen to a repository's tmux session and a Claude session there: /session-switch <repo> [session]",
   },
-  { name: 'session-repos', description: 'List repositories and their sessions' },
-  {
-    name: 'session-stop',
-    description: 'Stop a background session, keeping its conversation: /session-stop <session>',
-  },
   { name: 'session-rm', description: 'Delete a background session and its worktree: /session-rm <session>' },
-  { name: 'session-logs', description: "Print a background session's recent output: /session-logs <session>" },
 ]
 
 const TOOLS: ToolSpec[] = [
@@ -418,8 +409,8 @@ const TOOLS: ToolSpec[] = [
   },
 ]
 
-// One at a time: a name the engine refuses (a background session has a
-// built-in /stop) drops only that one, not the tools, the poll and the pane after it.
+// One at a time: a name the engine refuses (a built-in's) drops only that
+// one, not the tools, the poll and the pane after it.
 async function declare($: EngineInterface): Promise<void> {
   for (const command of COMMANDS) {
     try {
@@ -493,49 +484,16 @@ export const register: Register = on => {
     return { text: 'Hub sessions pane opened.' }
   })
 
-  on('command.run', { command: 'session-dispatch' }, async ($, e) => {
-    const words = e.args.trim().split(/\s+/)
-    const label = words[0] === '-n' ? words.splice(0, 2)[1] : undefined
-    const [repo, ...rest] = words
-    const task = rest.join(' ')
-    if (!repo || !task) return { text: 'Usage: /session-dispatch [-n <label>] <repo> <task>' }
-    return { text: await dispatch($, { repo, task, label }) }
-  })
-
-  on('command.run', { command: 'session-send' }, async ($, e) => {
-    const [session, ...rest] = e.args.trim().split(/\s+/)
-    const task = rest.join(' ')
-    if (!session || !task) return { text: 'Usage: /session-send <session> <task>' }
-    return { text: await dispatch($, { session, task }) }
-  })
-
   on('command.run', { command: 'session-switch' }, async ($, e) => {
     const [repo, session] = e.args.trim().split(/\s+/)
     if (!repo) return { text: 'Usage: /session-switch <repo> [session]' }
     return { text: await switchRepo($, repo, session) }
   })
 
-  for (const verb of ['stop', 'rm'] as const) {
-    on('command.run', { command: `session-${verb}` }, async ($, e) => {
-      const name = e.args.trim()
-      if (!name) return { text: `Usage: /session-${verb} <session>` }
-      return { text: await stopOrRemove($, verb, name) }
-    })
-  }
-
-  on('command.run', { command: 'session-logs' }, async ($, e) => {
+  on('command.run', { command: 'session-rm' }, async ($, e) => {
     const name = e.args.trim()
-    if (!name) return { text: 'Usage: /session-logs <session>' }
-    return { text: await logsOf($, name) }
-  })
-
-  on('command.run', { command: 'session-repos' }, async $ => {
-    const [repos, rows] = await Promise.all([listRepos($), listRows($)])
-    const lines = repos.map(r => {
-      const ws = workersOf(rows, r.path).map(w => `${w.name}[${label(w)}]`)
-      return ws.length === 0 ? short(r.path) : `${short(r.path)}  ${ws.join(' ')}`
-    })
-    return { text: lines.join('\n') }
+    if (!name) return { text: 'Usage: /session-rm <session>' }
+    return { text: await stopOrRemove($, 'rm', name) }
   })
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {

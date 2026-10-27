@@ -407,25 +407,23 @@ function claudeOnly(on: any, runs: string[][], answer: (argv: string[]) => { exi
   })
 }
 
-test('/session-stop and session-stop stop the named session by its id', async ($, on) => {
+const STOP = 'mcp__session-hub__session-stop'
+
+test('session-stop stops the named session by its id', async ($, on) => {
   const runs: string[][] = []
   claudeOnly(on, runs, () => ({ exitCode: 0 }))
 
-  expect((await $.command.run({ command: 'session-stop', args: 'ccwatch' } as any)).text).toBe('Stopped ccwatch.')
-  const ran: any = await $.tool.call({ tool: 'mcp__session-hub__session-stop', session: 'ccwatch' } as any)
+  const ran: any = await $.tool.call({ tool: STOP, session: 'ccwatch' } as any)
   expect(ran.result).toBe('Stopped ccwatch.')
-  expect(runs.filter(a => a[1] === 'stop')).toEqual([
-    ['claude', 'stop', 'w'],
-    ['claude', 'stop', 'w'],
-  ])
+  expect(runs.filter(a => a[1] === 'stop')).toEqual([['claude', 'stop', 'w']])
 })
 
-test('/session-stop to a session nobody has lists the sessions', async ($, on) => {
+test('session-stop to a session nobody has lists the sessions', async ($, on) => {
   const runs: string[][] = []
   claudeOnly(on, runs, () => ({ exitCode: 0 }))
 
-  const text = (await $.command.run({ command: 'session-stop', args: 'nope' } as any)).text
-  expect(text).toBe('No session named "nope". Sessions: hub, ccwatch')
+  const ran: any = await $.tool.call({ tool: STOP, session: 'nope' } as any)
+  expect(ran.result).toBe('No session named "nope". Sessions: hub, ccwatch')
   expect(runs.some(a => a[1] === 'stop')).toBe(false)
 })
 
@@ -438,21 +436,17 @@ test('/session-rm passes on a refusal word for word and adds no flag that overri
   expect(runs.filter(a => a[1] === 'rm')).toEqual([['claude', 'rm', 'w']])
 })
 
-test('/session-logs and session-logs return the tail of the output', async ($, on) => {
+test('session-logs returns the tail of the output', async ($, on) => {
   const runs: string[][] = []
   const lines = Array.from({ length: 250 }, (_, i) => `line ${i + 1}`)
   claudeOnly(on, runs, () => ({ exitCode: 0, stdout: lines.join('\n') + '\n' }))
 
-  const text = (await $.command.run({ command: 'session-logs', args: 'ccwatch' } as any)).text
+  const ran: any = await $.tool.call({ tool: 'mcp__session-hub__session-logs', session: 'ccwatch' } as any)
+  const text: string = ran.result
   expect(text.split('\n')[0]).toBe('(last 200 of 250 lines)')
   expect(text.split('\n')[1]).toBe('line 51')
   expect(text.endsWith('line 250')).toBe(true)
-  const ran: any = await $.tool.call({ tool: 'mcp__session-hub__session-logs', session: 'ccwatch' } as any)
-  expect(ran.result).toBe(text)
-  expect(runs.filter(a => a[1] === 'logs')).toEqual([
-    ['claude', 'logs', 'w'],
-    ['claude', 'logs', 'w'],
-  ])
+  expect(runs.filter(a => a[1] === 'logs')).toEqual([['claude', 'logs', 'w']])
 })
 
 test('the pane lists the hub itself too when it is a background session', async ($, on) => {
@@ -473,7 +467,7 @@ test('a command the engine refuses at session start leaves the rest registered',
   claudeOnly(on, [], () => ({ exitCode: 0 }))
   on('session.start', (_: unknown, e: any) => ({ cwd: e.cwd }))
   on('command.register', (_: unknown, e: any) => {
-    if (e.name === 'session-stop') throw new Error(`"/${e.name}" refused: it is a built-in`)
+    if (e.name === 'session-switch') throw new Error(`"/${e.name}" refused: it is a built-in`)
     commands.push(e.name)
     return { value: { command: e.name } }
   })
@@ -492,10 +486,9 @@ test('a command the engine refuses at session start leaves the rest registered',
 
   await $.session.start({ cwd: '/home/u/hub', surface: null, isInteractive: false } as any)
 
-  expect(commands).toContain('session-rm')
-  expect(commands).not.toContain('session-stop')
+  expect(commands).toEqual(['session-hub', 'session-rm'])
   expect(tools).toEqual(['session-dispatch', 'session-prepare', 'session-stop', 'session-logs', 'session-list'])
-  expect(logs.some(l => l.includes('/session-stop'))).toBe(true)
+  expect(logs.some(l => l.includes('/session-switch'))).toBe(true)
   expect(opened.map(e => e.id)).toEqual(['hub-sessions'])
 })
 
