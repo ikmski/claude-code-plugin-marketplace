@@ -1,7 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 
 import type { AgentRow } from '../types'
-import { findSession, newSessionName, parseRepos, resolveRepo, workersOf } from './register'
+import { findSession, newSessionName, paneGroups, parseRepos, resolveRepo, workersOf } from './register'
 
 const REPOS = parseRepos(
   [
@@ -96,6 +96,10 @@ function engine(on: any, agents: AgentRow[], runs: string[][], sent: any[], onRu
           ? 'ccwatch\n'
           : cmd === 'tmux-claude-attach'
             ? 'claude-w\n'
+            : cmd === 'tmux' && sub === 'list-sessions'
+              ? 'ccwatch\t/home/u/develop/ikmski/ccwatch\n'
+              : cmd === 'tmux' && sub === 'display-message'
+                ? '/dev/pts/1\n'
             : cmd === 'claude' && sub === 'agents'
               ? JSON.stringify(agents)
               : ''
@@ -289,7 +293,7 @@ const PANE = {
   },
 } as const
 
-test('the pane lists background sessions with state and repository, on every surface', async ($, on) => {
+test('the pane lists background sessions under their repository, on every surface', async ($, on) => {
   on('session.id', () => ({ value: 'hub-id' }))
   on('process.run', () => ({
     value: {
@@ -308,10 +312,33 @@ test('the pane lists background sessions with state and repository, on every sur
 
   for (const surface of ['terminal', 'desktop'] as const) {
     const ui = await $.ui.mount({ ...PANE, surface })
-    expect((await ui.find({ type: 'Text', text: /ccwatch · working/ }))?.text).toMatch(/^ccwatch · working · /)
+    expect((await ui.find({ type: 'Text', text: 'ikmski/ccwatch' }))?.text).toBe('ikmski/ccwatch')
+    expect((await ui.find({ type: 'Text', text: /● ccwatch/ }))?.text).toBe(' ● ccwatch')
+    expect((await ui.find({ type: 'Text', text: /^working / }))).not.toBe(undefined)
     expect((await ui.find({ type: 'Text', text: /hub/ }))).toBe(undefined)
     await ui.unmount()
   }
+})
+
+test('pressing a session in the pane switches to its tmux window', async ($, on) => {
+  const runs: string[][] = []
+  engine(on, AGENTS, runs, [])
+  const toasts: string[] = []
+  on('ui.toast', (_: unknown, e: any) => {
+    toasts.push(e.text)
+    return { value: undefined }
+  })
+  await $.tool.call({ tool: 'mcp__session-hub__hub_sessions' } as any)
+
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  await ui.press({ key: 'w-id' })
+  await ui.unmount()
+
+  expect(runs.filter(a => a[0] === 'tmux-project' || a[0] === 'tmux-claude-attach')).toEqual([
+    ['tmux-project', '/home/u/develop/ikmski/ccwatch'],
+    ['tmux-claude-attach', '-t', 'ccwatch', '-i', 'w-id', '-c', '/dev/pts/1'],
+  ])
+  expect(toasts).toEqual(['Opened ccwatch in tmux.'])
 })
 
 test('/hub opens the pane narrow, and closes it when it is open', async ($, on) => {
@@ -354,4 +381,19 @@ test('/hub draws the pane that waits undrawn instead of closing it', async ($, o
 
   expect((await $.command.run({ command: 'hub' } as any)).text).toBe('Hub sessions pane opened.')
   expect(opened.length).toBe(1)
+})
+
+test('paneGroups groups by directory, working first and stopped last', () => {
+  const groups = paneGroups([
+    row({ sessionId: 'a-old', cwd: '/a', state: 'done', startedAt: 1 }),
+    row({ sessionId: 'b', cwd: '/b', state: 'done', startedAt: 9 }),
+    row({ sessionId: 'a-stop', cwd: '/a', state: 'stopped', startedAt: 8 }),
+    row({ sessionId: 'a-new', cwd: '/a', state: 'done', startedAt: 5 }),
+    row({ sessionId: 'c', cwd: '/c', state: 'working', startedAt: 2 }),
+  ])
+  expect(groups.map(g => [g.path, g.rows.map(r => r.sessionId)])).toEqual([
+    ['/c', ['c']],
+    ['/b', ['b']],
+    ['/a', ['a-new', 'a-old', 'a-stop']],
+  ])
 })
