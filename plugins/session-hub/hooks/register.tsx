@@ -4,7 +4,7 @@ import type { EngineInterface, Register } from 'claude-code'
 import type { AgentRow } from '../types'
 
 const PANE = 'hub-sessions'
-// Fits "<name> · <state> · <age>" and the repository path under ~/develop
+// Fits a repository path under ~/develop and " ● <name>  <state> <age>"
 // without taking the dock's default share from the transcript.
 const PANE_COLUMNS = 40
 // Every poll starts a `claude agents` process, so keep it slow.
@@ -78,6 +78,29 @@ export function findSession(rows: AgentRow[], name: string): AgentRow | undefine
 
 export function isStopped(row: AgentRow): boolean {
   return row.state === 'stopped'
+}
+
+function isWorking(row: AgentRow): boolean {
+  return label(row) === 'working'
+}
+
+export type PaneGroup = { path: string; rows: AgentRow[] }
+
+// The pane's rows by directory: working sessions first, stopped ones last,
+// newer before older; groups holding a working session first, then by the
+// newest session.
+export function paneGroups(rows: AgentRow[]): PaneGroup[] {
+  const rank = (r: AgentRow) => (isWorking(r) ? 0 : isStopped(r) ? 2 : 1)
+  const byPath = new Map<string, AgentRow[]>()
+  for (const r of rows) byPath.set(r.cwd, [...(byPath.get(r.cwd) ?? []), r])
+  const groups = [...byPath].map(([path, rs]) => ({
+    path,
+    rows: rs.sort((a, b) => rank(a) - rank(b) || b.startedAt - a.startedAt),
+  }))
+  const newest = (g: PaneGroup) => Math.max(...g.rows.map(r => r.startedAt))
+  return groups.sort(
+    (a, b) => Number(!a.rows.some(isWorking)) - Number(!b.rows.some(isWorking)) || newest(b) - newest(a),
+  )
 }
 
 async function listRows($: EngineInterface): Promise<AgentRow[]> {
@@ -216,16 +239,21 @@ async function openDetached($: EngineInterface, path: string, attachArgs: string
 async function open($: EngineInterface, query: string, sessionName?: string): Promise<string> {
   const found = await target($, query, sessionName)
   if (typeof found === 'string') return found
-  const { repo, attachArgs } = found
-  const project = await $.process.run(['tmux-project', repo.path])
+  return switchTo($, found.repo.path, found.attachArgs)
+}
+
+// Switches this client to the tmux session of `path`, then to the window
+// tmux-claude-attach picks for `attachArgs`.
+async function switchTo($: EngineInterface, path: string, attachArgs: string[]): Promise<string> {
+  const project = await $.process.run(['tmux-project', path])
   if (project.exitCode !== 0) return `tmux-project failed: ${project.stderr.trim()}`
   const ls = await $.process.run(['tmux', 'list-sessions', '-F', '#{session_name}\t#{session_path}'])
-  const session = parseRepos(ls.stdout).find(s => s.path === repo.path)?.name
-  if (!session) return `No tmux session has ${repo.path} as its directory.`
+  const session = parseRepos(ls.stdout).find(s => s.path === path)?.name
+  if (!session) return `No tmux session has ${path} as its directory.`
   // The picker popup needs a client to show on: this pane's.
   const client = (await $.process.run(['tmux', 'display-message', '-p', '#{client_name}'])).stdout.trim()
-  if (client) attachArgs.push('-c', client)
-  const attach = await $.process.run(['tmux-claude-attach', '-t', session, ...attachArgs])
+  const clientArgs = client ? ['-c', client] : []
+  const attach = await $.process.run(['tmux-claude-attach', '-t', session, ...attachArgs, ...clientArgs])
   if (attach.exitCode !== 0) return `tmux-claude-attach failed: ${attach.stderr.trim()}`
   await refresh($)
   return `Opened ${session} in tmux.`
@@ -402,23 +430,34 @@ export const register: Register = on => {
   })
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
-    const { Box, Text } = $.ui.resolve(e)
-    const rows = (await read($, sessions)).filter(r => r.kind === 'background')
+    const { Box, Button, Text } = $.ui.resolve(e)
+    const groups = paneGroups((await read($, sessions)).filter(r => r.kind === 'background'))
     const err = await read($, error)
     const now = Date.now()
-    const color = (r: AgentRow) =>
-      label(r) === 'working' ? 'yellow' : r.status === 'idle' ? 'green' : undefined
+    const color = (r: AgentRow) => (isWorking(r) ? 'yellow' : r.status === 'idle' ? 'green' : undefined)
+    const mark = (r: AgentRow) => (isWorking(r) ? '●' : isStopped(r) ? '◌' : '○')
+    const jump = async (r: AgentRow) => $.ui.toast(await switchTo($, r.cwd, ['-i', r.sessionId]))
 
     return (
       <Box flexDirection="column">
         {err !== '' && <Text color="red">{err}</Text>}
-        {rows.length === 0 && <Text dimColor>No background sessions.</Text>}
-        {rows.map(r => (
-          <Box flexDirection="column">
-            <Text color={color(r)} bold={!isStopped(r)} dimColor={isStopped(r)}>
-              {r.name} · {label(r)} · {age(r.startedAt, now)}
-            </Text>
-            <Text dimColor>  {short(r.cwd)}</Text>
+        {groups.length === 0 && <Text dimColor>No background sessions.</Text>}
+        {groups.map(g => (
+          <Box key={g.path} flexDirection="column">
+            <Text bold>{short(g.path)}</Text>
+            {g.rows.map(r => (
+              <Box key={r.sessionId} justifyContent="space-between">
+                <Button key={r.sessionId} plain onPress={() => void jump(r)}>
+                  <Text color={color(r)} dimColor={isStopped(r)} wrap="truncate-end">
+                    {' '}
+                    {mark(r)} {r.name}
+                  </Text>
+                </Button>
+                <Text color={color(r)} dimColor={isStopped(r)}>
+                  {label(r)} {age(r.startedAt, now)}
+                </Text>
+              </Box>
+            ))}
           </Box>
         ))}
       </Box>
