@@ -161,10 +161,7 @@ export async function dispatch($: EngineInterface, args: DispatchArgs): Promise<
 
   if (args.session) {
     const worker = findSession(rows, args.session)
-    if (!worker) {
-      const names = rows.filter(r => r.kind === 'background').map(r => r.name)
-      return `No session named "${args.session}". Sessions: ${names.join(', ') || '(none)'}`
-    }
+    if (!worker) return noSession(rows, args.session)
     if (isStopped(worker)) {
       const ran = await $.process.run(['claude', '--resume', worker.sessionId, '--bg', text], {
         cwd: worker.cwd,
@@ -262,6 +259,41 @@ async function switchTo($: EngineInterface, path: string, attachArgs: string[]):
   return `Opened ${session} in tmux.`
 }
 
+// A row's short id is what `claude stop`, `rm` and `logs` are documented to take.
+const jobId = (row: AgentRow) => row.id ?? row.sessionId
+
+function noSession(rows: AgentRow[], name: string): string {
+  const names = rows.filter(r => r.kind === 'background').map(r => r.name)
+  return `No session named "${name}". Sessions: ${names.join(', ') || '(none)'}`
+}
+
+// `rm` runs as given: its refusal over unpushed commits or a worktree it could
+// not remove comes back word for word, and the flags that override it are left
+// to the person at a shell.
+export async function stopOrRemove($: EngineInterface, verb: 'stop' | 'rm', name: string): Promise<string> {
+  const rows = await listRows($)
+  const worker = findSession(rows, name)
+  if (!worker) return noSession(rows, name)
+  const ran = await $.process.run(['claude', verb, jobId(worker)])
+  await refresh($)
+  const said = (ran.stdout + ran.stderr).trim()
+  if (ran.exitCode !== 0) return `claude ${verb} ${worker.name} failed: ${said}`
+  return said || `${verb === 'stop' ? 'Stopped' : 'Removed'} ${worker.name}.`
+}
+
+const LOG_LINES = 200
+
+export async function logsOf($: EngineInterface, name: string): Promise<string> {
+  const rows = await listRows($)
+  const worker = findSession(rows, name)
+  if (!worker) return noSession(rows, name)
+  const ran = await $.process.run(['claude', 'logs', jobId(worker)])
+  if (ran.exitCode !== 0) return `claude logs ${worker.name} failed: ${ran.stderr.trim()}`
+  const lines = ran.stdout.trimEnd().split('\n')
+  const cut = lines.length > LOG_LINES ? `(last ${LOG_LINES} of ${lines.length} lines)\n` : ''
+  return cut + lines.slice(-LOG_LINES).join('\n')
+}
+
 function openPane($: EngineInterface) {
   return $.ui.open({ id: PANE, title: 'Hub sessions', columns: PANE_COLUMNS })
 }
@@ -289,6 +321,18 @@ export const register: Register = on => {
       description: 'Send a task to an existing session: /send <session> <task>',
     })
     await $.command.register({ name: 'repos', description: 'List repositories and their sessions' })
+    await $.command.register({
+      name: 'stop',
+      description: 'Stop a background session, keeping its conversation: /stop <session>',
+    })
+    await $.command.register({
+      name: 'rm',
+      description: 'Delete a background session and its worktree: /rm <session>',
+    })
+    await $.command.register({
+      name: 'logs',
+      description: "Print a background session's recent output: /logs <session>",
+    })
     await $.command.register({
       name: 'open',
       description: "Open a repository's tmux session and attach to a Claude session: /open <repo> [session]",
@@ -353,6 +397,30 @@ export const register: Register = on => {
       isDeferred: false,
     })
     await $.tool.register({
+      name: 'hub_stop',
+      description:
+        'Stop a background session (`claude stop`). Its conversation is kept; hub_dispatch to it ' +
+        'resumes it.',
+      inputSchema: {
+        type: 'object',
+        properties: { session: { type: 'string', description: 'Name of the session to stop' } },
+        required: ['session'],
+      },
+      isDeferred: false,
+    })
+    await $.tool.register({
+      name: 'hub_logs',
+      description:
+        "Read a background session's recent terminal output (`claude logs`), to see what it did " +
+        'without attaching to it.',
+      inputSchema: {
+        type: 'object',
+        properties: { session: { type: 'string', description: 'Name of the session to read' } },
+        required: ['session'],
+      },
+      isDeferred: false,
+    })
+    await $.tool.register({
       name: 'hub_sessions',
       description: 'List the active Claude Code sessions (`claude agents --json`) with repository paths.',
       isDeferred: false,
@@ -390,6 +458,14 @@ export const register: Register = on => {
     return { result: JSON.stringify(rows.map(r => ({ ...r, repo: short(r.cwd) })), null, 2) }
   }).catch(($, e, next) => ({ deny: `session-hub: hub_sessions failed: ${String(next.error)}` }))
 
+  on('tool.call', { tool: 'mcp__session-hub__hub_stop' }, async ($, e: any) => ({
+    result: await stopOrRemove($, 'stop', String(e.session ?? '')),
+  })).catch(($, e, next) => ({ deny: `session-hub: hub_stop failed: ${String(next.error)}` }))
+
+  on('tool.call', { tool: 'mcp__session-hub__hub_logs' }, async ($, e: any) => ({
+    result: await logsOf($, String(e.session ?? '')),
+  })).catch(($, e, next) => ({ deny: `session-hub: hub_logs failed: ${String(next.error)}` }))
+
   on('command.run', { command: 'hub' }, async $ => {
     // The pane opened at session start waits undrawn on a narrow terminal;
     // /hub then draws it rather than closing what the person never saw.
@@ -423,6 +499,20 @@ export const register: Register = on => {
     return { text: await open($, repo, session) }
   })
 
+  for (const verb of ['stop', 'rm'] as const) {
+    on('command.run', { command: verb }, async ($, e) => {
+      const name = e.args.trim()
+      if (!name) return { text: `Usage: /${verb} <session>` }
+      return { text: await stopOrRemove($, verb, name) }
+    })
+  }
+
+  on('command.run', { command: 'logs' }, async ($, e) => {
+    const name = e.args.trim()
+    if (!name) return { text: 'Usage: /logs <session>' }
+    return { text: await logsOf($, name) }
+  })
+
   on('command.run', { command: 'repos' }, async $ => {
     const [repos, rows] = await Promise.all([listRepos($), listRows($)])
     const lines = repos.map(r => {
@@ -434,7 +524,9 @@ export const register: Register = on => {
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
     const { Box, Button, Text } = $.ui.resolve(e)
-    const groups = paneGroups((await read($, sessions)).filter(r => r.kind === 'background'))
+    // The hub is itself a background session when started with --bg.
+    const me = await $.session.id()
+    const groups = paneGroups((await read($, sessions)).filter(r => r.kind === 'background' && r.sessionId !== me))
     const err = await read($, error)
     const now = Date.now()
     const color = (r: AgentRow) => (isWorking(r) ? 'yellow' : r.status === 'idle' ? 'green' : undefined)
