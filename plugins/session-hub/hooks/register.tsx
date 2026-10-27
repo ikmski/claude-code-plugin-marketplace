@@ -197,15 +197,29 @@ export async function prepare($: EngineInterface, args: PrepareArgs): Promise<st
   return prepareWindow($, repo.path, ['-n', ...(args.label ? [args.label] : [])])
 }
 
-async function prepareWindow($: EngineInterface, path: string, attachArgs: string[]): Promise<string> {
+// Sets up the tmux session of `path` without switching to it (a background
+// session runs outside tmux, where a plain `tmux-project <path>` attaches and
+// fails with "not a terminal"), then runs tmux-claude-attach in it with `args`.
+// Answers the tmux session and what tmux-claude-attach printed, or why not.
+async function attachIn(
+  $: EngineInterface,
+  path: string,
+  args: string[],
+): Promise<{ session: string; printed: string } | string> {
   const project = await $.process.run(['tmux-project', '-d', path])
   if (project.exitCode !== 0) return `tmux-project failed: ${project.stderr.trim()}`
   const session = project.stdout.trim()
   if (!session) return `tmux-project -d printed no session name for ${path}.`
-  const attach = await $.process.run(['tmux-claude-attach', '-d', '-t', session, ...attachArgs])
+  const attach = await $.process.run(['tmux-claude-attach', '-t', session, ...args])
   if (attach.exitCode !== 0) return `tmux-claude-attach failed: ${attach.stderr.trim()}`
   await refresh($)
-  return `${session} の window ${attach.stdout.trim()} に出した。入るには prefix S 等で切り替える。`
+  return { session, printed: attach.stdout.trim() }
+}
+
+async function prepareWindow($: EngineInterface, path: string, attachArgs: string[]): Promise<string> {
+  const done = await attachIn($, path, ['-d', ...attachArgs])
+  if (typeof done === 'string') return done
+  return `${done.session} の window ${done.printed} に出した。入るには prefix S 等で切り替える。`
 }
 
 // For /session-switch: a session by its name, else a repository, where
@@ -218,24 +232,15 @@ async function switchToQuery($: EngineInterface, query: string): Promise<string>
   return switchTo($, repo.path, [])
 }
 
-// Switches the person's tmux client to the tmux session of `path`, then to the
-// window tmux-claude-attach picks for `attachArgs`. A background session runs
-// outside tmux, where a plain `tmux-project <path>` attaches and fails with
-// "not a terminal", so the session is only set up (-d) and tmux-claude-attach
-// switches the client.
+// Switches the person's tmux client to the window tmux-claude-attach picks
+// for `attachArgs` in the tmux session of `path`.
 async function switchTo($: EngineInterface, path: string, attachArgs: string[]): Promise<string> {
-  const project = await $.process.run(['tmux-project', '-d', path])
-  if (project.exitCode !== 0) return `tmux-project failed: ${project.stderr.trim()}`
-  const session = project.stdout.trim()
-  if (!session) return `tmux-project -d printed no session name for ${path}.`
   // Outside tmux this is the client tmux finds best, the one last used; the
   // picker popup is shown on it, and it is the one switched.
   const client = (await $.process.run(['tmux', 'display-message', '-p', '#{client_name}'])).stdout.trim()
-  const clientArgs = client ? ['-c', client] : []
-  const attach = await $.process.run(['tmux-claude-attach', '-t', session, ...attachArgs, ...clientArgs])
-  if (attach.exitCode !== 0) return `tmux-claude-attach failed: ${attach.stderr.trim()}`
-  await refresh($)
-  return `Opened ${session} in tmux.`
+  const done = await attachIn($, path, [...attachArgs, ...(client ? ['-c', client] : [])])
+  if (typeof done === 'string') return done
+  return `Opened ${done.session} in tmux.`
 }
 
 // A row's short id is what `claude stop`, `rm` and `logs` are documented to take.

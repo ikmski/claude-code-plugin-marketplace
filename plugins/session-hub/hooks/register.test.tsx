@@ -198,7 +198,7 @@ test('session-prepare puts a session, found by its name, in a window without swi
 
   expect(detached(runs)).toEqual([
     ['tmux-project', '-d', '/home/u/develop/ikmski/ccwatch'],
-    ['tmux-claude-attach', '-d', '-t', 'ccwatch', '-i', 'w-id'],
+    ['tmux-claude-attach', '-t', 'ccwatch', '-d', '-i', 'w-id'],
   ])
   expect(ran.result).toMatch(/^ccwatch の window claude-w に出した/)
 })
@@ -212,8 +212,8 @@ test('session-prepare without a session opens a new Claude session, with its lab
 
   const attaches = runs.filter(a => a[0] === 'tmux-claude-attach')
   expect(attaches).toEqual([
-    ['tmux-claude-attach', '-d', '-t', 'ccwatch', '-n'],
-    ['tmux-claude-attach', '-d', '-t', 'ccwatch', '-n', 'review'],
+    ['tmux-claude-attach', '-t', 'ccwatch', '-d', '-n'],
+    ['tmux-claude-attach', '-t', 'ccwatch', '-d', '-n', 'review'],
   ])
 })
 
