@@ -96,10 +96,8 @@ function engine(on: any, agents: AgentRow[], runs: string[][], sent: any[], onRu
           ? 'ccwatch\n'
           : cmd === 'tmux-claude-attach'
             ? 'claude-w\n'
-            : cmd === 'tmux' && sub === 'list-sessions'
-              ? 'ccwatch\t/home/u/develop/ikmski/ccwatch\n'
-              : cmd === 'tmux' && sub === 'display-message'
-                ? '/dev/pts/1\n'
+            : cmd === 'tmux' && sub === 'display-message'
+              ? '/dev/pts/1\n'
             : cmd === 'claude' && sub === 'agents'
               ? JSON.stringify(agents)
               : ''
@@ -335,7 +333,7 @@ test('pressing a session in the pane switches to its tmux window', async ($, on)
   await ui.unmount()
 
   expect(runs.filter(a => a[0] === 'tmux-project' || a[0] === 'tmux-claude-attach')).toEqual([
-    ['tmux-project', '/home/u/develop/ikmski/ccwatch'],
+    ['tmux-project', '-d', '/home/u/develop/ikmski/ccwatch'],
     ['tmux-claude-attach', '-t', 'ccwatch', '-i', 'w-id', '-c', '/dev/pts/1'],
   ])
   expect(toasts).toEqual(['Opened ccwatch in tmux.'])
