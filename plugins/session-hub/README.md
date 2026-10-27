@@ -14,6 +14,8 @@ settings（`.claude/settings.json`）でだけ有効にする。Work ごとに h
   - `tmux-project -d <path>`: tmux session を用意するだけで client を切り替えず、session 名を出す
   - `tmux-claude-attach -d -t <session> (-i <sessionId> | -n [LABEL])`: window を作るだけで
     切り替えず、window 名を出す
+  - `tmux-claude-attach -t <session> [-i <sessionId>] -c <client>`: ユーザーの client を
+    その window へ切り替える。hub はバックグラウンドで tmux の外にいるため、client は明示する
 - 依頼文には「終わったら SendMessage で <hub> へ返す」が付く。`<hub>` は依頼した時点の hub の
   セッション名で、`claude --bg` で argv から起動したセッションは返信先を知らないため。
   hub の名前が取れないときは返信先を付けずに送り、そう伝える。
