@@ -34,11 +34,11 @@ Claude Code に断られたものだけが欠けて、その旨を transcript �
   指定しなければリポジトリで新しいセッションを起動し（名前は `<repo>`、2 つ目から
   `<repo>-<用途>` か `<repo>-2` …）、指定すればそのセッションへ送る（止まっていれば再開する）。
   リポジトリとセッションの対応は名前でなく cwd で取る（別 org に同名のリポジトリがありうるため）。
-  ツールは `prepare: true` なら、そのあと `session-prepare` と同じように tmux へ出す。
-- `session-prepare`（ツール）: リポジトリの tmux session と、その中の Claude session の window を
+- `session-prepare`（ツール）: Claude session の window を、そのリポジトリの tmux session に
   ユーザーの画面を切り替えずに用意し、どの session の何という window かを返す。セッション名を
-  指定すればそのバックグラウンドセッションに attach し、省略すれば新しい Claude session を始める。
-- `/session-switch`（コマンド）: 同じように用意したうえで、人の画面をそこへ切り替える。
+  指定すればそのバックグラウンドセッションに attach し、省略すればリポジトリで新しい Claude session を始める。
+- `/session-switch <session|repo>`（コマンド）: 同じように用意したうえで、人の画面をそこへ切り替える。
+  セッション名でなければリポジトリとして扱い、`tmux-claude-attach` が選ぶ（複数あれば選択の popup）。
 - バックグラウンドセッションの状態を出すドックペイン（状態が変わるとトースト）。ペインはセッション
   開始時に開き、`/session-hub` で開閉を切り替える（ペインの閉じるマークや ctrl+x x でも閉じる）。
   ペインはリポジトリごとにまとめ、行を押すとそのセッションの tmux window へ画面を切り替える。
