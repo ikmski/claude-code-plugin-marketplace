@@ -1,14 +1,16 @@
 # session-hub
 
-hub として使う Claude Code セッションから、`~/develop/<org>/<repo>/` ごとのバックグラウンド
-セッション（`claude --bg`）へタスクを依頼し、その状態をペインで見るための mod。
+Claude Code のセッションから、`~/develop/<org>/<repo>/` ごとのバックグラウンドセッション
+（`claude --bg`）へタスクを依頼し、その一覧をペインで見てセッション間を移るための mod。
 
-hub は Obsidian リポジトリで起動した Claude で、この mod は Obsidian リポジトリの project
-settings（`.claude/settings.json`）でだけ有効にする。Work ごとに hub が複数いてよい。
+user scope で入れ、どのセッションでも使う。起動時はコマンドと遅延読み込みのツールを登録する
+だけで、何も動かさない。`/session-hub` でペインを開いたセッションが hub になり、ペインが
+開いている間だけ一覧を 15 秒おきに読み直す（1 回ごとに `claude agents` を起動する。見えていなくても
+開いている限り続くので、使わないときはペインを閉じる）。
 
-hub は Obsidian の tmux session で `prefix A`（`tmux-claude-attach`）から「新しいセッション」として
+バックグラウンドのセッションは `prefix A`（`tmux-claude-attach`）から「新しいセッション」として
 起動する。対話型の `claude` を `/bg` すると、セッション ID が変わるのに window の印
-（`@claude_session`）は付かないので、hub へ移るたびに window が 1 つ増える。
+（`@claude_session`）は付かないので、そのセッションへ移るたびに window が 1 つ増える。
 
 ## 前提
 
@@ -20,13 +22,13 @@ hub は Obsidian の tmux session で `prefix A`（`tmux-claude-attach`）から
     切り替えず、window 名を出す
   - `tmux-claude-attach -t <session> [-i <sessionId>] -c <client>`: ユーザーの client を
     その window へ切り替える。hub はバックグラウンドで tmux の外にいるため、client は明示する
-- 依頼文には「終わったら SendMessage で <hub> へ返す」が付く。`<hub>` は依頼した時点の hub の
+- 依頼文には「終わったら SendMessage で <依頼元> へ返す」が付く。`<依頼元>` は依頼した時点の
   セッション名で、`claude --bg` で argv から起動したセッションは返信先を知らないため。
-  hub の名前が取れないときは返信先を付けずに送り、そう伝える。
+  名前が取れないときは返信先を付けずに送り、そう伝える。
 
 ## できること
 
-依頼・一覧・停止・ログは hub に言葉で頼み、モデルがツール（`mcp__session-hub__session-*`）を使う。
+依頼・一覧・停止・ログはどのセッションからでも言葉で頼め、モデルがツール（`mcp__session-hub__session-*`）を使う。
 人が打つコマンドは、ペインの開閉・画面の切り替え・削除の 3 つだけ。名前は 1 つずつ登録し、
 Claude Code に断られたものだけが欠けて、その旨を transcript に出す。
 
@@ -39,10 +41,9 @@ Claude Code に断られたものだけが欠けて、その旨を transcript �
   指定すればそのバックグラウンドセッションに attach し、省略すればリポジトリで新しい Claude session を始める。
 - `/session-switch <session|repo>`（コマンド）: 同じように用意したうえで、人の画面をそこへ切り替える。
   セッション名でなければリポジトリとして扱い、`tmux-claude-attach` が選ぶ（複数あれば選択の popup）。
-- バックグラウンドセッションの状態を出すドックペイン（状態が変わるとトースト）。ペインはセッション
-  開始時に開き、`/session-hub` で開閉を切り替える（ペインの閉じるマークや ctrl+x x でも閉じる）。
-  ペインはリポジトリごとにまとめ、行を押すとそのセッションの tmux window へ画面を切り替える。
-  Obsidian で開いたセッションはどれも hub として働き、ペインには自分も出る。
+- バックグラウンドセッションの状態を出すドックペイン。`/session-hub` で開閉を切り替える（ペインの
+  閉じるマークや ctrl+x x でも閉じる）。ペインはリポジトリごとにまとめ、行を押すとそのセッションの
+  tmux window へ画面を切り替える。ペインには自分も出る。
 - 一覧: ツール `session-list`（`claude agents` の JSON）。
 - 片付けと結果の確認: `session-stop`（会話は残り、依頼すると再開する）・`session-logs`
   （`claude logs` の末尾）はツール、`/session-rm`（worktree ごと消す）は人が打つコマンドだけ。

@@ -1,4 +1,4 @@
-import { expect, test } from 'claude-code/testing'
+import { expect, mock, test } from 'claude-code/testing'
 
 import type { AgentRow } from '../types'
 import { findSession, newSessionName, paneGroups, parseRepos, resolveRepo } from './register'
@@ -318,6 +318,7 @@ test('/session-hub opens the pane narrow, and closes it when it is open', async 
   const opened: any[] = []
   const closed: any[] = []
   let isOpen = false
+  claudeOnly(on, [], () => ({ exitCode: 0 }))
   on('ui.panes', () => ({
     value: isOpen ? [{ id: 'hub-sessions', title: 'Hub sessions', isShown: true, isFocused: false, isPlaced: true }] : [],
   }))
@@ -339,21 +340,54 @@ test('/session-hub opens the pane narrow, and closes it when it is open', async 
   expect((await $.command.run({ command: 'session-hub' } as any)).text).toBe('Hub sessions pane opened.')
 })
 
-test('/session-hub draws the pane that waits undrawn instead of closing it', async ($, on) => {
-  const opened: any[] = []
+// The pane as the engine keeps it, and the `claude agents` runs that poll it.
+function paneEngine(on: any) {
+  const runs: string[][] = []
+  const clock = mock.clock(on)
+  let isOpen = false
+  claudeOnly(on, runs, () => ({ exitCode: 0 }))
   on('ui.panes', () => ({
-    value: [{ id: 'hub-sessions', title: 'Hub sessions', isShown: true, isFocused: false, isPlaced: false }],
+    value: isOpen ? [{ id: 'hub-sessions', title: 'Hub sessions', isShown: true, isFocused: false, isPlaced: true }] : [],
   }))
-  on('ui.open', (_: unknown, e: any) => {
-    opened.push(e)
+  on('ui.open', () => {
+    isOpen = true
     return { value: { isPlaced: true } }
   })
   on('ui.close', () => {
-    throw new Error('closed')
+    isOpen = false
+    return { value: undefined }
+  })
+  const polls = () => runs.filter(a => a[1] === 'agents').length
+  return { clock, polls }
+}
+
+test('the list is polled only while the pane is open', async ($, on) => {
+  const { clock, polls } = paneEngine(on)
+
+  await $.command.run({ command: 'session-hub' } as any)
+  expect(polls()).toBe(1)
+  await clock.advance(15_000 * 2)
+  expect(polls()).toBe(3)
+
+  await $.command.run({ command: 'session-hub' } as any)
+  await clock.advance(15_000 * 4)
+  expect(polls()).toBe(3)
+})
+
+test('a state change of a session raises no toast', async ($, on) => {
+  const toasts: string[] = []
+  const { clock } = paneEngine(on)
+  on('ui.toast', (_: unknown, e: any) => {
+    toasts.push(e.text)
+    return { value: undefined }
   })
 
-  expect((await $.command.run({ command: 'session-hub' } as any)).text).toBe('Hub sessions pane opened.')
-  expect(opened.length).toBe(1)
+  await $.command.run({ command: 'session-hub' } as any)
+  WORKER.state = 'done'
+  await clock.advance(15_000)
+  WORKER.state = 'working'
+
+  expect(toasts).toEqual([])
 })
 
 test('paneGroups groups by directory, working first and stopped last', () => {
@@ -435,12 +469,13 @@ test('the pane lists the hub itself too when it is a background session', async 
   await ui.unmount()
 })
 
-test('a command the engine refuses at session start leaves the rest registered', async ($, on) => {
+test('session start registers the commands and deferred tools, and runs nothing', async ($, on) => {
   const commands: string[] = []
-  const tools: string[] = []
+  const tools: any[] = []
   const logs: string[] = []
   const opened: any[] = []
-  claudeOnly(on, [], () => ({ exitCode: 0 }))
+  const runs: string[][] = []
+  claudeOnly(on, runs, () => ({ exitCode: 0 }))
   on('session.start', (_: unknown, e: any) => ({ cwd: e.cwd }))
   on('command.register', (_: unknown, e: any) => {
     if (e.name === 'session-switch') throw new Error(`"/${e.name}" refused: it is a built-in`)
@@ -448,7 +483,7 @@ test('a command the engine refuses at session start leaves the rest registered',
     return { value: { command: e.name } }
   })
   on('tool.register', (_: unknown, e: any) => {
-    tools.push(e.name)
+    tools.push(e)
     return { value: { tool: `mcp__session-hub__${e.name}` } }
   })
   on('ui.log', (_: unknown, e: any) => {
@@ -462,9 +497,12 @@ test('a command the engine refuses at session start leaves the rest registered',
 
   await $.session.start({ cwd: '/home/u/hub', surface: null, isInteractive: false } as any)
 
+  // A refused name (session-switch here) drops only itself.
   expect(commands).toEqual(['session-hub', 'session-rm'])
-  expect(tools).toEqual(['session-dispatch', 'session-prepare', 'session-stop', 'session-logs', 'session-list'])
   expect(logs.some(l => l.includes('/session-switch'))).toBe(true)
-  expect(opened.map(e => e.id)).toEqual(['hub-sessions'])
+  expect(tools.map(t => t.name)).toEqual(['session-dispatch', 'session-prepare', 'session-stop', 'session-logs', 'session-list'])
+  expect(tools.every(t => t.isDeferred === true)).toBe(true)
+  expect(opened).toEqual([])
+  expect(runs).toEqual([])
 })
 

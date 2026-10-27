@@ -117,14 +117,6 @@ async function refresh($: EngineInterface): Promise<void> {
     await update($, error, () => String(err))
     return
   }
-  const before = await read($, sessions)
-  for (const row of rows) {
-    const old = before.find(o => o.sessionId === row.sessionId)
-    const was = old && label(old)
-    if (row.kind === 'background' && was !== undefined && was !== label(row)) {
-      $.ui.toast(`${row.name}: ${was} → ${label(row)}`)
-    }
-  }
   await update($, sessions, () => rows)
   await update($, error, () => '')
 }
@@ -278,8 +270,19 @@ export async function logsOf($: EngineInterface, name: string): Promise<string> 
   return cut + lines.slice(-LOG_LINES).join('\n')
 }
 
-function openPane($: EngineInterface) {
-  return $.ui.open({ id: PANE, title: 'Hub sessions', columns: PANE_COLUMNS })
+// The pane is the hub: the list is polled only while it is open, whether or
+// not anyone looks at it, and closing it stops the poll.
+let poll: { cancel: () => void } | undefined
+
+async function openPane($: EngineInterface): Promise<void> {
+  await refresh($)
+  await $.ui.open({ id: PANE, title: 'Hub sessions', columns: PANE_COLUMNS })
+  poll ??= $.clock.every(POLL_MS, () => refresh($))
+}
+
+function stopPolling(): void {
+  poll?.cancel()
+  poll = undefined
 }
 
 function age(startedAt: number, now: number): string {
@@ -331,7 +334,7 @@ const TOOLS: ToolSpec[] = [
       },
       required: ['task'],
     },
-    isDeferred: false,
+    isDeferred: true,
   },
   {
     name: 'session-prepare',
@@ -355,7 +358,7 @@ const TOOLS: ToolSpec[] = [
         },
       },
     },
-    isDeferred: false,
+    isDeferred: true,
   },
   {
     name: 'session-stop',
@@ -367,7 +370,7 @@ const TOOLS: ToolSpec[] = [
       properties: { session: { type: 'string', description: 'Name of the session to stop' } },
       required: ['session'],
     },
-    isDeferred: false,
+    isDeferred: true,
   },
   {
     name: 'session-logs',
@@ -379,17 +382,17 @@ const TOOLS: ToolSpec[] = [
       properties: { session: { type: 'string', description: 'Name of the session to read' } },
       required: ['session'],
     },
-    isDeferred: false,
+    isDeferred: true,
   },
   {
     name: 'session-list',
     description: 'List the active Claude Code sessions (`claude agents --json`) with repository paths.',
-    isDeferred: false,
+    isDeferred: true,
   },
 ]
 
 // One at a time: a name the engine refuses (a built-in's) drops only that
-// one, not the tools, the poll and the pane after it.
+// one, not the rest.
 async function declare($: EngineInterface): Promise<void> {
   for (const command of COMMANDS) {
     try {
@@ -411,12 +414,16 @@ export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     const started = await next(e)
 
+    // Every session gets the commands and the deferred tools, and nothing
+    // runs until the pane is opened or a tool is called.
     await declare($)
-    await refresh($)
-    $.clock.every(POLL_MS, () => refresh($))
-    void openPane($)
 
     return started
+  })
+
+  on('ui.close', async ($, e, next) => {
+    if (e.id === PANE) stopPolling()
+    return next(e)
   })
 
   on('tool.call', { tool: 'mcp__session-hub__session-dispatch' }, async ($, e: any) => {
@@ -452,10 +459,9 @@ export const register: Register = on => {
   })).catch(($, e, next) => ({ deny: `session-hub: session-logs failed: ${String(next.error)}` }))
 
   on('command.run', { command: 'session-hub' }, async $ => {
-    // The pane opened at session start waits undrawn on a narrow terminal;
-    // /session-hub then draws it rather than closing what the person never saw.
-    if ((await $.ui.panes()).some(p => p.id === PANE && p.isPlaced)) {
+    if ((await $.ui.panes()).some(p => p.id === PANE)) {
       await $.ui.close({ id: PANE })
+      stopPolling()
       return { text: 'Hub sessions pane closed.' }
     }
     await openPane($)
