@@ -115,13 +115,13 @@ async function listRepos($: EngineInterface): Promise<Repo[]> {
   return parseRepos(ran.stdout)
 }
 
-async function refresh($: EngineInterface): Promise<void> {
+async function refresh($: EngineInterface): Promise<AgentRow[] | undefined> {
   let rows: AgentRow[]
   try {
     rows = await listRows($)
   } catch (err) {
     await update($, error, () => String(err))
-    return
+    return undefined
   }
   const before = await read($, sessions)
   for (const row of rows) {
@@ -133,7 +133,66 @@ async function refresh($: EngineInterface): Promise<void> {
   }
   await update($, sessions, () => rows)
   await update($, error, () => '')
+  return rows
 }
+
+// tmux-claude-attach knows a session's window by this window option alone.
+const WINDOW_OPTION = '@claude_session'
+
+// A session started with plain `claude` in tmux marks its window, so that
+// /bg can hand the window on (adoptWindow).
+async function markWindow($: EngineInterface, rows: AgentRow[], isInteractive: boolean): Promise<void> {
+  const me = await $.session.id()
+  if (!isInteractive || rows.find(r => r.sessionId === me)?.kind !== 'interactive') return
+  const pane = await $.env.get('TMUX_PANE')
+  if (pane) await $.process.run(['tmux', 'set-option', '-w', '-t', pane, WINDOW_OPTION, me])
+}
+
+// /bg forks the conversation into a background session under a new id. The
+// parent's transcript then holds a `continued-in` row naming the new id
+// (observed in Claude Code 2.1.311, not documented; the forked process's argv
+// does not name the parent). Where the parent's window still runs claude, it
+// draws the new session, which takes the mark over so that jumping to it (the
+// pane, prefix A) finds that window instead of opening another one. A window
+// /bg left at its shell keeps the stale mark, which matches no session.
+// Answers whether it took a window over.
+async function adoptWindow($: EngineInterface, rows: AgentRow[]): Promise<boolean> {
+  const me = await $.session.id()
+  if (rows.find(r => r.sessionId === me)?.kind !== 'background') return false
+  const windows = await $.process.run([
+    'tmux',
+    'list-windows',
+    '-a',
+    '-F',
+    `#{window_id}\t#{${WINDOW_OPTION}}\t#{pane_current_command}`,
+  ])
+  if (windows.exitCode !== 0) return false
+  const listed = new Set(rows.map(r => r.sessionId))
+  const marks = windows.stdout.split('\n').flatMap(line => {
+    const [window, session, command] = line.split('\t')
+    return window && session && command === 'claude' && !listed.has(session) ? [[window, session] as const] : []
+  })
+  if (marks.length === 0) return false
+  const config = (await $.env.get('CLAUDE_CONFIG_DIR')) ?? `${await $.env.get('HOME')}/.claude`
+  const found = await $.process.run([
+    'grep',
+    '-rlF',
+    ...[...new Set(marks.map(([, session]) => session))].map(session => `--include=${session}.jsonl`),
+    `"continuedInSessionId":"${me}"`,
+    `${config}/projects`,
+  ])
+  const parents = new Set(found.stdout.split('\n').map(path => path.split('/').pop()?.replace(/\.jsonl$/, '')))
+  const adopted = marks.filter(([, session]) => parents.has(session))
+  for (const [window] of adopted) {
+    await $.process.run(['tmux', 'set-option', '-w', '-t', window, WINDOW_OPTION, me])
+  }
+  return adopted.length > 0
+}
+
+// The parent writes `continued-in`, and a parent that lets go of its window
+// exits, around when the new session starts; so the first few polls look,
+// not the start.
+const ADOPT_POLLS = 4
 
 function label(row: AgentRow): string {
   return row.state ?? row.status
@@ -442,8 +501,13 @@ export const register: Register = on => {
     const started = await next(e)
 
     await declare($)
-    await refresh($)
-    $.clock.every(POLL_MS, () => refresh($))
+    const rows = await refresh($)
+    if (rows) await markWindow($, rows, e.isInteractive)
+    let adoptPolls = ADOPT_POLLS
+    $.clock.every(POLL_MS, async () => {
+      const polled = await refresh($)
+      if (polled && adoptPolls > 0) adoptPolls = (await adoptWindow($, polled)) ? 0 : adoptPolls - 1
+    })
     void openPane($)
 
     return started
@@ -540,9 +604,7 @@ export const register: Register = on => {
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
     const { Box, Button, Text } = $.ui.resolve(e)
-    // The hub is itself a background session when started with --bg.
-    const me = await $.session.id()
-    const groups = paneGroups((await read($, sessions)).filter(r => r.kind === 'background' && r.sessionId !== me))
+    const groups = paneGroups((await read($, sessions)).filter(r => r.kind === 'background'))
     const err = await read($, error)
     const now = Date.now()
     const color = (r: AgentRow) => (isWorking(r) ? 'yellow' : r.status === 'idle' ? 'green' : undefined)
