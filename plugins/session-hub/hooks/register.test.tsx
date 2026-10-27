@@ -397,3 +397,73 @@ test('paneGroups groups by directory, working first and stopped last', () => {
     ['/a', ['a-new', 'a-old', 'a-stop']],
   ])
 })
+
+const BG_HUB = row({ sessionId: 'hub-id', id: 'hub', name: 'hub', cwd: '/home/u/hub' })
+const WORKER = row({ sessionId: 'w-id', id: 'w', name: 'ccwatch', cwd: '/home/u/develop/ikmski/ccwatch', state: 'working' })
+
+function claudeOnly(on: any, runs: string[][], answer: (argv: string[]) => { exitCode: number; stdout?: string; stderr?: string }) {
+  on('session.id', () => ({ value: 'hub-id' }))
+  on('process.run', (_: unknown, e: any) => {
+    runs.push([...e.argv])
+    const out = e.argv[1] === 'agents' ? { exitCode: 0, stdout: JSON.stringify([BG_HUB, WORKER]) } : answer(e.argv)
+    return { value: { stdout: '', stderr: '', ...out } }
+  })
+}
+
+test('/stop and hub_stop stop the named session by its id', async ($, on) => {
+  const runs: string[][] = []
+  claudeOnly(on, runs, () => ({ exitCode: 0 }))
+
+  expect((await $.command.run({ command: 'stop', args: 'ccwatch' } as any)).text).toBe('Stopped ccwatch.')
+  const ran: any = await $.tool.call({ tool: 'mcp__session-hub__hub_stop', session: 'ccwatch' } as any)
+  expect(ran.result).toBe('Stopped ccwatch.')
+  expect(runs.filter(a => a[1] === 'stop')).toEqual([
+    ['claude', 'stop', 'w'],
+    ['claude', 'stop', 'w'],
+  ])
+})
+
+test('/stop to a session nobody has lists the sessions', async ($, on) => {
+  const runs: string[][] = []
+  claudeOnly(on, runs, () => ({ exitCode: 0 }))
+
+  const text = (await $.command.run({ command: 'stop', args: 'nope' } as any)).text
+  expect(text).toBe('No session named "nope". Sessions: hub, ccwatch')
+  expect(runs.some(a => a[1] === 'stop')).toBe(false)
+})
+
+test('/rm passes on a refusal word for word and adds no flag that overrides it', async ($, on) => {
+  const runs: string[][] = []
+  claudeOnly(on, runs, () => ({ exitCode: 1, stderr: 'has unpushed commits: pass --discard-unpushed abc@wt\n' }))
+
+  const text = (await $.command.run({ command: 'rm', args: 'ccwatch' } as any)).text
+  expect(text).toBe('claude rm ccwatch failed: has unpushed commits: pass --discard-unpushed abc@wt')
+  expect(runs.filter(a => a[1] === 'rm')).toEqual([['claude', 'rm', 'w']])
+})
+
+test('/logs and hub_logs return the tail of the output', async ($, on) => {
+  const runs: string[][] = []
+  const lines = Array.from({ length: 250 }, (_, i) => `line ${i + 1}`)
+  claudeOnly(on, runs, () => ({ exitCode: 0, stdout: lines.join('\n') + '\n' }))
+
+  const text = (await $.command.run({ command: 'logs', args: 'ccwatch' } as any)).text
+  expect(text.split('\n')[0]).toBe('(last 200 of 250 lines)')
+  expect(text.split('\n')[1]).toBe('line 51')
+  expect(text.endsWith('line 250')).toBe(true)
+  const ran: any = await $.tool.call({ tool: 'mcp__session-hub__hub_logs', session: 'ccwatch' } as any)
+  expect(ran.result).toBe(text)
+  expect(runs.filter(a => a[1] === 'logs')).toEqual([
+    ['claude', 'logs', 'w'],
+    ['claude', 'logs', 'w'],
+  ])
+})
+
+test('the pane leaves out the hub when it is a background session', async ($, on) => {
+  claudeOnly(on, [], () => ({ exitCode: 0 }))
+  await $.tool.call({ tool: 'mcp__session-hub__hub_sessions' } as any)
+
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  expect((await ui.find({ type: 'Text', text: /● ccwatch/ }))?.text).toBe(' ● ccwatch')
+  expect(await ui.find({ type: 'Text', text: /hub/ })).toBe(undefined)
+  await ui.unmount()
+})
