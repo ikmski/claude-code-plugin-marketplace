@@ -6,6 +6,10 @@ hub として使う Claude Code セッションから、`~/develop/<org>/<repo>/
 hub は Obsidian リポジトリで起動した Claude で、この mod は Obsidian リポジトリの project
 settings（`.claude/settings.json`）でだけ有効にする。Work ごとに hub が複数いてよい。
 
+hub は Obsidian の tmux session で `prefix A`（`tmux-claude-attach`）から「新しいセッション」として
+起動する。対話型の `claude` を `/bg` すると、セッション ID が変わるのに window の印
+（`@claude_session`）は付かないので、hub へ移るたびに window が 1 つ増える。
+
 ## 前提
 
 - `tmux-project` と `tmux-claude-attach` が PATH にあること。どちらも ikmski/nix-config が
@@ -40,12 +44,6 @@ settings（`.claude/settings.json`）でだけ有効にする。Work ごとに h
   開始時に開き、`/session-hub` で開閉を切り替える（ペインの閉じるマークや ctrl+x x でも閉じる）。
   ペインはリポジトリごとにまとめ、行を押すとそのセッションの tmux window へ画面を切り替える。
   Obsidian で開いたセッションはどれも hub として働き、ペインには自分も出る。
-- tmux の中で `claude` を起動すると、その window にセッション ID の印（window オプション
-  `@claude_session`。`tmux-claude-attach` が window を探すのに使う）を付ける。`/bg` で ID が変わったあとも
-  その window が claude を描き続けていれば、バックグラウンド側が印を付け替える。そのため、ペインや
-  `tmux-claude-attach` から hub へ移っても window は増えない。`/bg` で shell に戻った window の印は
-  付け替えない。付け替えは、元の transcript に残る `continued-in`（引き継ぎ先の ID）から元の ID を
-  辿って行う。これは観測した挙動で、ドキュメントには無い。
 - 一覧: ツール `session-list`（`claude agents` の JSON）、コマンド `/session-repos`（リポジトリごと）。
 - 片付けと結果の確認: `session-stop`（会話は残り、依頼すると再開する）・`session-logs`
   （`claude logs` の末尾）はツールとコマンドの両方、`/session-rm`（worktree ごと消す）は人が打つ
