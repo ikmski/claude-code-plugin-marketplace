@@ -242,15 +242,18 @@ async function open($: EngineInterface, query: string, sessionName?: string): Pr
   return switchTo($, found.repo.path, found.attachArgs)
 }
 
-// Switches this client to the tmux session of `path`, then to the window
-// tmux-claude-attach picks for `attachArgs`.
+// Switches the person's tmux client to the tmux session of `path`, then to the
+// window tmux-claude-attach picks for `attachArgs`. A background session runs
+// outside tmux, where a plain `tmux-project <path>` attaches and fails with
+// "not a terminal", so the session is only set up (-d) and tmux-claude-attach
+// switches the client.
 async function switchTo($: EngineInterface, path: string, attachArgs: string[]): Promise<string> {
-  const project = await $.process.run(['tmux-project', path])
+  const project = await $.process.run(['tmux-project', '-d', path])
   if (project.exitCode !== 0) return `tmux-project failed: ${project.stderr.trim()}`
-  const ls = await $.process.run(['tmux', 'list-sessions', '-F', '#{session_name}\t#{session_path}'])
-  const session = parseRepos(ls.stdout).find(s => s.path === path)?.name
-  if (!session) return `No tmux session has ${path} as its directory.`
-  // The picker popup needs a client to show on: this pane's.
+  const session = project.stdout.trim()
+  if (!session) return `tmux-project -d printed no session name for ${path}.`
+  // Outside tmux this is the client tmux finds best, the one last used; the
+  // picker popup is shown on it, and it is the one switched.
   const client = (await $.process.run(['tmux', 'display-message', '-p', '#{client_name}'])).stdout.trim()
   const clientArgs = client ? ['-c', client] : []
   const attach = await $.process.run(['tmux-claude-attach', '-t', session, ...attachArgs, ...clientArgs])
