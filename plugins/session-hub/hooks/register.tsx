@@ -4,9 +4,9 @@ import type { CommandSpec, EngineInterface, Register, ToolSpec } from 'claude-co
 import type { AgentRow } from '../types'
 
 const PANE = 'hub-sessions'
-// Fits a repository path under ~/develop and " ● <name>  <state> <age>"
-// without taking the dock's default share from the transcript.
-const PANE_COLUMNS = 40
+// Fits <org>/<repo> and " ● <label>  <state> <age>" (a session is named by
+// its label alone) without taking the dock's default share from the transcript.
+const PANE_COLUMNS = 32
 // Every poll starts a `claude agents` process, so keep it slow.
 const POLL_MS = 15_000
 
@@ -43,22 +43,31 @@ export function resolveRepo(repos: Repo[], query: string): Repo | string {
   return `"${q}" matches several repositories: ${partial.map(r => r.path).join(', ')}`
 }
 
-const sanitize = (s: string) => s.replace(/[.:]/g, '_')
+// tmux takes `.` and `:` in a target as separators.
+const sanitize = (s: string) => s.trim().replace(/\s+/g, '-').replace(/[.:]/g, '_')
 
-// The same rule as tmux-project and tmux-claude-attach: the directory name, or
-// <org>-<repo> when another directory's session already has it; a further
-// session of the repository adds -<label>, or -2, -3 ... when it has none or
-// the name is taken.
-export function newSessionName(repo: Repo, rows: AgentRow[], label = ''): string {
-  const [dir = '', org = ''] = repo.path.split('/').reverse()
-  const clash = rows.some(r => r.name === sanitize(dir) && r.cwd !== repo.path)
-  const base = clash ? sanitize(`${org}-${dir}`) : sanitize(dir)
-  const stem = label.trim() === '' ? base : `${base}-${sanitize(label.trim())}`
+// The label alone: the pane shows a session under its repository, and the
+// name is also its tmux window's. A session is addressed by its name alone
+// (session-dispatch, SendMessage), so a name any session has gets -2, -3 ...;
+// with no label, 1, 2 ...
+export function newSessionName(rows: AgentRow[], label = ''): string {
+  const stem = sanitize(label)
   const taken = new Set(rows.map(r => r.name))
+  if (stem === '') {
+    let n = 1
+    while (taken.has(String(n))) n++
+    return String(n)
+  }
   if (!taken.has(stem)) return stem
   let n = 2
   while (taken.has(`${stem}-${n}`)) n++
   return `${stem}-${n}`
+}
+
+// A session in a worktree Claude Code made (`<repo>/.claude/worktrees/<name>`)
+// is shown under its repository.
+export function repoRoot(cwd: string): string {
+  return cwd.replace(/\/\.claude\/worktrees\/[^/]+$/, '')
 }
 
 // A running session of the name before a stopped one, the newest first (left
@@ -80,13 +89,13 @@ function isWorking(row: AgentRow): boolean {
 
 export type PaneGroup = { path: string; rows: AgentRow[] }
 
-// The pane's rows by directory: working sessions first, stopped ones last,
+// The pane's rows by repository: working sessions first, stopped ones last,
 // newer before older; groups holding a working session first, then by the
 // newest session.
 export function paneGroups(rows: AgentRow[]): PaneGroup[] {
   const rank = (r: AgentRow) => (isWorking(r) ? 0 : isStopped(r) ? 2 : 1)
   const byPath = new Map<string, AgentRow[]>()
-  for (const r of rows) byPath.set(r.cwd, [...(byPath.get(r.cwd) ?? []), r])
+  for (const r of rows) byPath.set(repoRoot(r.cwd), [...(byPath.get(repoRoot(r.cwd)) ?? []), r])
   const groups = [...byPath].map(([path, rs]) => ({
     path,
     rows: rs.sort((a, b) => rank(a) - rank(b) || b.startedAt - a.startedAt),
@@ -116,14 +125,6 @@ async function refresh($: EngineInterface): Promise<void> {
   } catch (err) {
     await update($, error, () => String(err))
     return
-  }
-  const before = await read($, sessions)
-  for (const row of rows) {
-    const old = before.find(o => o.sessionId === row.sessionId)
-    const was = old && label(old)
-    if (row.kind === 'background' && was !== undefined && was !== label(row)) {
-      $.ui.toast(`${row.name}: ${was} → ${label(row)}`)
-    }
   }
   await update($, sessions, () => rows)
   await update($, error, () => '')
@@ -172,21 +173,28 @@ export async function dispatch($: EngineInterface, args: DispatchArgs): Promise<
   if (!args.repo) return 'Name a repository to start a session in, or a session to send to.'
   const repo = resolveRepo(await listRepos($), args.repo)
   if (typeof repo === 'string') return repo
-  const name = newSessionName(repo, rows, args.label)
-  const ran = await $.process.run(['claude', '--bg', '--name', name, text], { cwd: repo.path })
-  await refresh($)
-  if (ran.exitCode !== 0) return `Could not start a session in ${repo.path}: ${ran.stderr.trim()}`
+  const name = newSessionName(rows, args.label)
+  const failed = await start($, repo.path, name, [text])
+  if (failed) return failed
   return `Started ${name} in ${repo.path}. Follow up with session "${name}".${warn}`
+}
+
+// Starts a background session named `name` in `path`, with `prompt` (none:
+// it waits for one); answers why not when it could not.
+async function start($: EngineInterface, path: string, name: string, prompt: string[]): Promise<string | undefined> {
+  const ran = await $.process.run(['claude', '--bg', '--name', name, ...prompt], { cwd: path })
+  await refresh($)
+  return ran.exitCode === 0 ? undefined : `Could not start a session in ${path}: ${ran.stderr.trim()}`
 }
 
 export type PrepareArgs = { session?: string; repo?: string; label?: string }
 
 // For the model: the user's screen stays where it is. A session is found by
-// its name, which newSessionName keeps unique; without one, the window starts
-// a new Claude session in `repo`.
+// its name, which newSessionName keeps unique; without one, a new session is
+// started in `repo` under this mod's naming (not tmux-claude-attach's -n).
 export async function prepare($: EngineInterface, args: PrepareArgs): Promise<string> {
+  const rows = await listRows($)
   if (args.session) {
-    const rows = await listRows($)
     const worker = findSession(rows, args.session)
     if (!worker) return noSession(rows, args.session)
     return prepareWindow($, worker.cwd, ['-i', worker.sessionId])
@@ -194,7 +202,12 @@ export async function prepare($: EngineInterface, args: PrepareArgs): Promise<st
   if (!args.repo) return 'Name a session to put in tmux, or a repository to start one in.'
   const repo = resolveRepo(await listRepos($), args.repo)
   if (typeof repo === 'string') return repo
-  return prepareWindow($, repo.path, ['-n', ...(args.label ? [args.label] : [])])
+  const name = newSessionName(rows, args.label)
+  const failed = await start($, repo.path, name, [])
+  if (failed) return failed
+  const started = findSession(await read($, sessions), name)
+  if (!started) return `Started ${name} in ${repo.path}, but it is not listed yet: prepare session "${name}".`
+  return prepareWindow($, repo.path, ['-i', started.sessionId])
 }
 
 // Sets up the tmux session of `path` without switching to it (a background
@@ -278,8 +291,19 @@ export async function logsOf($: EngineInterface, name: string): Promise<string> 
   return cut + lines.slice(-LOG_LINES).join('\n')
 }
 
-function openPane($: EngineInterface) {
-  return $.ui.open({ id: PANE, title: 'Hub sessions', columns: PANE_COLUMNS })
+// The pane is the hub: the list is polled only while it is open, whether or
+// not anyone looks at it, and closing it stops the poll.
+let poll: { cancel: () => void } | undefined
+
+async function openPane($: EngineInterface): Promise<void> {
+  await refresh($)
+  await $.ui.open({ id: PANE, title: 'Hub sessions', columns: PANE_COLUMNS })
+  poll ??= $.clock.every(POLL_MS, () => refresh($))
+}
+
+function stopPolling(): void {
+  poll?.cancel()
+  poll = undefined
 }
 
 function age(startedAt: number, now: number): string {
@@ -326,12 +350,14 @@ const TOOLS: ToolSpec[] = [
         },
         label: {
           type: 'string',
-          description: "Short purpose for a new session's name (review → <repo>-review)",
+          description:
+            "A new session's name: one or two words for what it does, taken from the task (review, aws-s3). " +
+            'The repository is not part of it; -2, -3 ... is added when the name is taken.',
         },
       },
       required: ['task'],
     },
-    isDeferred: false,
+    isDeferred: true,
   },
   {
     name: 'session-prepare',
@@ -351,11 +377,13 @@ const TOOLS: ToolSpec[] = [
         },
         label: {
           type: 'string',
-          description: 'Label for a new Claude session, used when `session` is omitted',
+          description:
+            "A new session's name when `session` is omitted: one or two words for what it is for " +
+            '(review, aws-s3), without the repository.',
         },
       },
     },
-    isDeferred: false,
+    isDeferred: true,
   },
   {
     name: 'session-stop',
@@ -367,7 +395,7 @@ const TOOLS: ToolSpec[] = [
       properties: { session: { type: 'string', description: 'Name of the session to stop' } },
       required: ['session'],
     },
-    isDeferred: false,
+    isDeferred: true,
   },
   {
     name: 'session-logs',
@@ -379,17 +407,17 @@ const TOOLS: ToolSpec[] = [
       properties: { session: { type: 'string', description: 'Name of the session to read' } },
       required: ['session'],
     },
-    isDeferred: false,
+    isDeferred: true,
   },
   {
     name: 'session-list',
     description: 'List the active Claude Code sessions (`claude agents --json`) with repository paths.',
-    isDeferred: false,
+    isDeferred: true,
   },
 ]
 
 // One at a time: a name the engine refuses (a built-in's) drops only that
-// one, not the tools, the poll and the pane after it.
+// one, not the rest.
 async function declare($: EngineInterface): Promise<void> {
   for (const command of COMMANDS) {
     try {
@@ -411,12 +439,16 @@ export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     const started = await next(e)
 
+    // Every session gets the commands and the deferred tools, and nothing
+    // runs until the pane is opened or a tool is called.
     await declare($)
-    await refresh($)
-    $.clock.every(POLL_MS, () => refresh($))
-    void openPane($)
 
     return started
+  })
+
+  on('ui.close', async ($, e, next) => {
+    if (e.id === PANE) stopPolling()
+    return next(e)
   })
 
   on('tool.call', { tool: 'mcp__session-hub__session-dispatch' }, async ($, e: any) => {
@@ -440,7 +472,7 @@ export const register: Register = on => {
     const rows = await listRows($)
     await update($, sessions, () => rows)
     // An array result is read as content blocks, so hand the rows over as text.
-    return { result: JSON.stringify(rows.map(r => ({ ...r, repo: short(r.cwd) })), null, 2) }
+    return { result: JSON.stringify(rows.map(r => ({ ...r, repo: short(repoRoot(r.cwd)) })), null, 2) }
   }).catch(($, e, next) => ({ deny: `session-hub: session-list failed: ${String(next.error)}` }))
 
   on('tool.call', { tool: 'mcp__session-hub__session-stop' }, async ($, e: any) => ({
@@ -452,10 +484,9 @@ export const register: Register = on => {
   })).catch(($, e, next) => ({ deny: `session-hub: session-logs failed: ${String(next.error)}` }))
 
   on('command.run', { command: 'session-hub' }, async $ => {
-    // The pane opened at session start waits undrawn on a narrow terminal;
-    // /session-hub then draws it rather than closing what the person never saw.
-    if ((await $.ui.panes()).some(p => p.id === PANE && p.isPlaced)) {
+    if ((await $.ui.panes()).some(p => p.id === PANE)) {
       await $.ui.close({ id: PANE })
+      stopPolling()
       return { text: 'Hub sessions pane closed.' }
     }
     await openPane($)
@@ -492,15 +523,19 @@ export const register: Register = on => {
             <Text bold>{short(g.path)}</Text>
             {g.rows.map(r => (
               <Box key={r.sessionId} justifyContent="space-between">
-                <Button key={r.sessionId} plain onPress={() => void jump(r)}>
-                  <Text color={color(r)} dimColor={isStopped(r)} wrap="truncate-end">
-                    {' '}
-                    {mark(r)} {r.name}
+                {/* A Button's label does not truncate: a long name wraps within its column, and the state keeps its place. */}
+                <Box flexShrink={1}>
+                  <Button key={r.sessionId} plain onPress={() => void jump(r)}>
+                    <Text color={color(r)} dimColor={isStopped(r)}>
+                      {` ${mark(r)} ${r.name}`}
+                    </Text>
+                  </Button>
+                </Box>
+                <Box flexShrink={0}>
+                  <Text color={color(r)} dimColor={isStopped(r)}>
+                    {` ${label(r)} ${age(r.startedAt, now)}`}
                   </Text>
-                </Button>
-                <Text color={color(r)} dimColor={isStopped(r)}>
-                  {label(r)} {age(r.startedAt, now)}
-                </Text>
+                </Box>
               </Box>
             ))}
           </Box>
