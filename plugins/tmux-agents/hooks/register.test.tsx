@@ -130,15 +130,21 @@ test('session-prepare passes on why tmux-claude-attach could not start a session
   expect(ran.result).toBe('tmux-claude-attach failed: tmux-claude-attach: claude agents が失敗した')
 })
 
-test('a window keeps the name of its session', async ($, on) => {
+test('a window keeps the name and sessionId of its session, matched by its job id', async ($, on) => {
   const runs: string[][] = []
-  // @1 is ccwatch's under an old name, @2 already right, @3 a session no longer listed, @4 not Claude's.
-  const windows = ['@1\tw-id\told', '@2\tme-id\tme', '@3\tgone-id\tgone', '@4\t\tzsh', ''].join('\n')
-  engine(on, AGENTS, runs, windows)
+  // Windows as "<window_id>\t<@claude_job>\t<@claude_session>\t<name>".
+  // @1 is ccwatch's job under an old name and the sessionId it had before resuming,
+  // @2 a window made before @claude_job, matched by its sessionId and already right,
+  // @3 a job no longer listed, @4 not Claude's.
+  const windows = ['@1\tw\told-id\told', '@2\t\tme-id\tme', '@3\tgone\tgone-id\tgone', '@4\t\t\tzsh', ''].join('\n')
+  engine(on, [AGENTS[0]!, { ...AGENTS[1]!, id: 'w' }], runs, windows)
 
   await $.tool.call({ tool: 'mcp__tmux-agents__session-stop', session: 'ccwatch' } as any)
 
-  expect(runs.filter(a => a[1] === 'rename-window')).toEqual([['tmux', 'rename-window', '-t', '@1', 'ccwatch']])
+  expect(runs.filter(a => a[0] === 'tmux' && (a[1] === 'set-option' || a[1] === 'rename-window'))).toEqual([
+    ['tmux', 'set-option', '-w', '-t', '@1', '@claude_session', 'w-id'],
+    ['tmux', 'rename-window', '-t', '@1', 'ccwatch'],
+  ])
 })
 
 test('session-prepare to a session nobody has opens nothing', async ($, on) => {

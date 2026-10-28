@@ -39,7 +39,8 @@ Claude Code に断られたものだけが欠けて、その旨を transcript �
   名前は用途だけでリポジトリ名は含めず、同じ名前があれば `-2`, `-3` …、用途が無ければ `1`, `2` …。
   リポジトリはペインの見出しに出る。
 - 名前は tmux の window 名にもなる。あとで名前が変わっても、attach したときとペインが一覧を読み直すたびに
-  window 名が追従する。
+  window 名が追従する。window とセッションは job id（再開しても変わらない）で対応させ、再開でセッション ID が
+  変わったときも同じ時点で window の `@claude_session` を付け直す（tmux のタブの状態表示はこれで window を探す）。
 - `session-prepare`（ツール）: Claude session の window を、そのリポジトリの tmux session に
   ユーザーの画面を切り替えずに用意し、どの session の何という window かを返す。セッション名を
   指定すればそのバックグラウンドセッションに attach し、省略すればリポジトリで新しいセッションを

@@ -108,21 +108,33 @@ async function refresh($: EngineInterface): Promise<void> {
   await update($, sessions, () => rows)
   await update($, error, () => '')
   try {
-    await renameWindows($, rows)
+    await syncWindows($, rows)
   } catch {
     // Without tmux there is no window to keep up to date.
   }
 }
 
-// tmux-claude-attach marks a session's window with the window option
-// @claude_session (its sessionId) and names it after the session; a name
-// changed since is carried over here.
-async function renameWindows($: EngineInterface, rows: AgentRow[]): Promise<void> {
-  const ran = await $.process.run(['tmux', 'list-windows', '-a', '-F', '#{window_id}\t#{@claude_session}\t#{window_name}'])
+// tmux-claude-attach marks a session's window with the window options
+// @claude_job (its job id, which resuming keeps) and @claude_session (its
+// sessionId, which resuming changes and claude-tmux-status looks a window up
+// by), and names it after the session. A window is matched by its job id, and
+// a sessionId or a name changed since is carried over here. A window made
+// before @claude_job is matched by its sessionId until tmux-claude-attach
+// attaches it again and marks it.
+async function syncWindows($: EngineInterface, rows: AgentRow[]): Promise<void> {
+  const ran = await $.process.run([
+    'tmux',
+    'list-windows',
+    '-a',
+    '-F',
+    '#{window_id}\t#{@claude_job}\t#{@claude_session}\t#{window_name}',
+  ])
   if (ran.exitCode !== 0) return
-  for (const [id, sid, name] of ran.stdout.split('\n').map(line => line.split('\t'))) {
-    const row = rows.find(r => r.sessionId === sid)
-    if (id && row && row.name !== name) await $.process.run(['tmux', 'rename-window', '-t', id, row.name])
+  for (const [wid, job, sid, name] of ran.stdout.split('\n').map(line => line.split('\t'))) {
+    const row = job ? rows.find(r => r.id === job) : rows.find(r => r.sessionId === sid)
+    if (!wid || !row) continue
+    if (row.sessionId !== sid) await $.process.run(['tmux', 'set-option', '-w', '-t', wid, '@claude_session', row.sessionId])
+    if (row.name !== name) await $.process.run(['tmux', 'rename-window', '-t', wid, row.name])
   }
 }
 
