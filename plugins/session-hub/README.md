@@ -18,7 +18,7 @@ user scope で入れ、どのセッションでも使う。起動時はコマン
   `~/.local/bin` に置く。この mod が使うのは次の形:
   - `tmux-project -l`: リポジトリの候補
   - `tmux-project -d <path>`: tmux session を用意するだけで client を切り替えず、session 名を出す
-  - `tmux-claude-attach -d -t <session> (-i <sessionId> | -n [LABEL])`: window を作るだけで
+  - `tmux-claude-attach -d -t <session> -i <sessionId>`: window を作るだけで
     切り替えず、window 名を出す
   - `tmux-claude-attach -t <session> [-i <sessionId>] -c <client>`: ユーザーの client を
     その window へ切り替える。hub はバックグラウンドで tmux の外にいるため、client は明示する
@@ -33,16 +33,21 @@ user scope で入れ、どのセッションでも使う。起動時はコマン
 Claude Code に断られたものだけが欠けて、その旨を transcript に出す。
 
 - `session-dispatch`（ツール）: 1 リポジトリに複数のセッションを持てる。セッション名を
-  指定しなければリポジトリで新しいセッションを起動し（名前は `<repo>`、2 つ目から
-  `<repo>-<用途>` か `<repo>-2` …）、指定すればそのセッションへ送る（止まっていれば再開する）。
-  リポジトリとセッションの対応は名前でなく cwd で取る（別 org に同名のリポジトリがありうるため）。
+  指定しなければリポジトリで新しいセッションを起動し、指定すればそのセッションへ送る（止まっていれば再開する）。
+- 新しいセッションの名前は用途（`review`、`aws-s3` など。依頼からモデルが付ける）だけで、リポジトリ名は
+  含めない。リポジトリはペインの見出しに出る。名前は tmux の window 名にもなる。セッションは名前だけで
+  指す（依頼の宛先・SendMessage の返信先）ので、どのリポジトリのものであれ同じ名前があれば `-2`, `-3` …、
+  用途が無ければ `1`, `2` … とする。`prefix A` の「新しいセッション」は `tmux-claude-attach`（nix-config）が
+  名前を付けるので、この規則に従わない。
 - `session-prepare`（ツール）: Claude session の window を、そのリポジトリの tmux session に
   ユーザーの画面を切り替えずに用意し、どの session の何という window かを返す。セッション名を
-  指定すればそのバックグラウンドセッションに attach し、省略すればリポジトリで新しい Claude session を始める。
+  指定すればそのバックグラウンドセッションに attach し、省略すればリポジトリで新しいセッションを
+  上の規則で起動してから attach する。
 - `/session-switch <session|repo>`（コマンド）: 同じように用意したうえで、人の画面をそこへ切り替える。
   セッション名でなければリポジトリとして扱い、`tmux-claude-attach` が選ぶ（複数あれば選択の popup）。
 - バックグラウンドセッションの状態を出すドックペイン。`/session-hub` で開閉を切り替える（ペインの
-  閉じるマークや ctrl+x x でも閉じる）。ペインはリポジトリごとにまとめ、行を押すとそのセッションの
+  閉じるマークや ctrl+x x でも閉じる）。ペインはリポジトリごとにまとめ（Claude Code の worktree
+  `<repo>/.claude/worktrees/<name>` で動くセッションはそのリポジトリの下に出す）、行を押すとそのセッションの
   tmux window へ画面を切り替える。ペインには自分も出る。
 - 一覧: ツール `session-list`（`claude agents` の JSON）。
 - 片付けと結果の確認: `session-stop`（会話は残り、依頼すると再開する）・`session-logs`

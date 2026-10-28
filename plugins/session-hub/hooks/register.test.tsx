@@ -1,7 +1,7 @@
 import { expect, mock, test } from 'claude-code/testing'
 
 import type { AgentRow } from '../types'
-import { findSession, newSessionName, paneGroups, parseRepos, resolveRepo } from './register'
+import { findSession, newSessionName, paneGroups, parseRepos, repoRoot, resolveRepo } from './register'
 
 const REPOS = parseRepos(
   [
@@ -38,24 +38,23 @@ test('resolveRepo takes a name, a path or a unique part of a path', () => {
   expect(resolveRepo(REPOS, 'nothing')).toMatch(/No repository/)
 })
 
-test('newSessionName adds the org only when another directory has the name', () => {
-  const ikmskiTmp = REPOS[2]!
-  expect(newSessionName(ikmskiTmp, [])).toBe('tmp')
-  expect(newSessionName(ikmskiTmp, [row({ name: 'tmp', cwd: '/home/u/develop/guildstudio/tmp' })])).toBe(
-    'ikmski-tmp',
-  )
+test('newSessionName is the label alone, numbered when any session has it', () => {
+  expect(newSessionName([], 'review')).toBe('review')
+  expect(newSessionName([], ' aws s3.log ')).toBe('aws-s3_log')
+  // Taken in another repository counts too: names are addressed alone.
+  const one = [row({ name: 'review', cwd: '/home/u/develop/ikmski/other' })]
+  expect(newSessionName(one, 'review')).toBe('review-2')
+  expect(newSessionName([...one, row({ name: 'review-2' })], 'review')).toBe('review-3')
 })
 
-test('newSessionName gives a further session a label or a number', () => {
-  const ccwatch = REPOS[0]!
-  const one = [row({ name: 'ccwatch', cwd: ccwatch.path })]
-  expect(newSessionName(ccwatch, one)).toBe('ccwatch-2')
-  expect(newSessionName(ccwatch, [...one, row({ name: 'ccwatch-2', cwd: ccwatch.path })])).toBe('ccwatch-3')
-  expect(newSessionName(ccwatch, one, 'review')).toBe('ccwatch-review')
-  expect(newSessionName(ccwatch, [...one, row({ name: 'ccwatch-review', cwd: ccwatch.path })], 'review')).toBe(
-    'ccwatch-review-2',
-  )
-  expect(newSessionName(ccwatch, [], 'review')).toBe('ccwatch-review')
+test('newSessionName without a label numbers from 1', () => {
+  expect(newSessionName([])).toBe('1')
+  expect(newSessionName([row({ name: '1' }), row({ name: '2' })], '  ')).toBe('3')
+})
+
+test('repoRoot shows a worktree session under its repository', () => {
+  expect(repoRoot('/home/u/develop/ikmski/ccwatch/.claude/worktrees/fix-x')).toBe('/home/u/develop/ikmski/ccwatch')
+  expect(repoRoot('/home/u/develop/ikmski/ccwatch')).toBe('/home/u/develop/ikmski/ccwatch')
 })
 
 test('findSession prefers a running session of the name', () => {
@@ -72,10 +71,11 @@ const AGENTS: AgentRow[] = [
   row({ sessionId: 'w-id', name: 'ccwatch', cwd: '/home/u/develop/ikmski/ccwatch' }),
 ]
 
-function engine(on: any, agents: AgentRow[], runs: string[][], sent: any[]) {
+function engine(on: any, agents: AgentRow[], runs: string[][], sent: any[], onRun?: (argv: string[]) => void) {
   on('session.id', () => ({ value: 'hub-id' }))
   on('process.run', (_: unknown, e: any) => {
     runs.push([...e.argv])
+    onRun?.(e.argv)
     const [cmd, sub] = e.argv
     const stdout =
       cmd === 'tmux-project' && sub === '-l'
@@ -117,11 +117,11 @@ test('dispatch starts a session when none works there', async ($, on) => {
   const sent: any[] = []
   engine(on, [AGENTS[0]!], runs, sent)
 
-  const ran: any = await $.tool.call({ tool: DISPATCH, repo: 'ikmski/tmp', task: 'clean up' } as any)
+  const ran: any = await $.tool.call({ tool: DISPATCH, repo: 'ikmski/tmp', task: 'clean up', label: 'cleanup' } as any)
 
-  expect(ran.result).toMatch(/^Started tmp in \/home\/u\/develop\/ikmski\/tmp/)
+  expect(ran.result).toMatch(/^Started cleanup in \/home\/u\/develop\/ikmski\/tmp/)
   const bg = runs.find(a => a.includes('--bg'))!
-  expect(bg.slice(0, 4)).toEqual(['claude', '--bg', '--name', 'tmp'])
+  expect(bg.slice(0, 4)).toEqual(['claude', '--bg', '--name', 'cleanup'])
   expect(bg[4]).toMatch(/clean up[\s\S]*hub/)
   expect(sent.length).toBe(0)
 })
@@ -154,8 +154,8 @@ test('dispatch without a session starts another one beside a running one', async
 
   const ran: any = await $.tool.call({ tool: DISPATCH, repo: 'ccwatch', task: 'review', label: 'review' } as any)
 
-  expect(ran.result).toMatch(/^Started ccwatch-review in .*Follow up with session "ccwatch-review"/)
-  expect(runs.find(a => a.includes('--bg'))!.slice(0, 4)).toEqual(['claude', '--bg', '--name', 'ccwatch-review'])
+  expect(ran.result).toMatch(/^Started review in .*Follow up with session "review"/)
+  expect(runs.find(a => a.includes('--bg'))!.slice(0, 4)).toEqual(['claude', '--bg', '--name', 'review'])
   expect(sent.length).toBe(0)
 })
 
@@ -203,18 +203,21 @@ test('session-prepare puts a session, found by its name, in a window without swi
   expect(ran.result).toMatch(/^ccwatch の window claude-w に出した/)
 })
 
-test('session-prepare without a session opens a new Claude session, with its label', async ($, on) => {
+test('session-prepare without a session starts one named by its label, then puts it in a window', async ($, on) => {
   const runs: string[][] = []
-  engine(on, AGENTS, runs, [])
+  const agents = [...AGENTS]
+  // `claude --bg` lists the new session from then on.
+  engine(on, agents, runs, [], argv => {
+    if (argv[1] === '--bg') agents.push(row({ sessionId: 'new-id', name: argv[3], cwd: '/home/u/develop/ikmski/ccwatch' }))
+  })
 
-  await $.tool.call({ tool: PREPARE, repo: 'ccwatch' } as any)
-  await $.tool.call({ tool: PREPARE, repo: 'ccwatch', label: 'review' } as any)
+  const ran: any = await $.tool.call({ tool: PREPARE, repo: 'ccwatch', label: 'review' } as any)
 
-  const attaches = runs.filter(a => a[0] === 'tmux-claude-attach')
-  expect(attaches).toEqual([
-    ['tmux-claude-attach', '-t', 'ccwatch', '-d', '-n'],
-    ['tmux-claude-attach', '-t', 'ccwatch', '-d', '-n', 'review'],
+  expect(runs.find(a => a[1] === '--bg')).toEqual(['claude', '--bg', '--name', 'review'])
+  expect(runs.filter(a => a[0] === 'tmux-claude-attach')).toEqual([
+    ['tmux-claude-attach', '-t', 'ccwatch', '-d', '-i', 'new-id'],
   ])
+  expect(ran.result).toMatch(/に出した/)
 })
 
 test('session-prepare to a session nobody has opens nothing', async ($, on) => {
@@ -318,6 +321,7 @@ test('/session-hub opens the pane narrow, and closes it when it is open', async 
   const opened: any[] = []
   const closed: any[] = []
   let isOpen = false
+  mock.clock(on)
   claudeOnly(on, [], () => ({ exitCode: 0 }))
   on('ui.panes', () => ({
     value: isOpen ? [{ id: 'hub-sessions', title: 'Hub sessions', isShown: true, isFocused: false, isPlaced: true }] : [],
@@ -334,7 +338,7 @@ test('/session-hub opens the pane narrow, and closes it when it is open', async 
   })
 
   expect((await $.command.run({ command: 'session-hub' } as any)).text).toBe('Hub sessions pane opened.')
-  expect(opened).toEqual([{ id: 'hub-sessions', title: 'Hub sessions', columns: 40 }])
+  expect(opened).toEqual([{ id: 'hub-sessions', title: 'Hub sessions', columns: 32 }])
   expect((await $.command.run({ command: 'session-hub' } as any)).text).toBe('Hub sessions pane closed.')
   expect(closed.map(e => e.id)).toEqual(['hub-sessions'])
   expect((await $.command.run({ command: 'session-hub' } as any)).text).toBe('Hub sessions pane opened.')
