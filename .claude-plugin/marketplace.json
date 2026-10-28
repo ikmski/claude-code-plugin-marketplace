@@ -38,9 +38,9 @@
             "description": "chrome-devtools-mcp で Chrome を操作できるようにするプラグイン。WSL2（ミラーモード）から Windows 側 Chrome への接続に対応"
         },
         {
-            "name": "session-hub",
-            "source": "./plugins/session-hub",
-            "description": "hub セッションから、リポジトリごとの Claude Code バックグラウンドセッションへタスクを依頼し、状態をペインで見る mod"
+            "name": "tmux-agents",
+            "source": "./plugins/tmux-agents",
+            "description": "agent view（claude agents）のバックグラウンドセッションを、リポジトリごとの tmux session / window で一覧・行き来する mod"
         }
     ]
 }

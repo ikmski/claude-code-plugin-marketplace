@@ -12,7 +12,7 @@ export type AgentRow = {
 
 declare module 'claude-code' {
   interface PluginState {
-    'session-hub': {
+    'tmux-agents': {
       sessions: Shaped<AgentRow[]>
       error: Shaped<string>
     }

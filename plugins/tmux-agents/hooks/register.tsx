@@ -3,17 +3,17 @@ import type { CommandSpec, EngineInterface, Register, ToolSpec } from 'claude-co
 
 import type { AgentRow } from '../types'
 
-const PANE = 'hub-sessions'
+const PANE = 'tmux-agents'
 // Fits <org>/<repo> and " ● <label>  <state> <age>" (a session is named by
 // its label alone) without taking the dock's default share from the transcript.
 const PANE_COLUMNS = 32
 // Every poll starts a `claude agents` process, so keep it slow.
 const POLL_MS = 15_000
 
-const sessions = atom({ plugin: 'session-hub', key: 'sessions' } as const, [], {
+const sessions = atom({ plugin: 'tmux-agents', key: 'sessions' } as const, [], {
   shape: 'sessions-1',
 })
-const error = atom({ plugin: 'session-hub', key: 'error' } as const, '', {
+const error = atom({ plugin: 'tmux-agents', key: 'error' } as const, '', {
   shape: 'error-1',
 })
 
@@ -206,7 +206,7 @@ async function prepareWindow($: EngineInterface, path: string, attachArgs: strin
   return `${done.session} の window ${done.printed} に出した。入るには prefix S 等で切り替える。`
 }
 
-// For /session-switch: a session by its name, else a repository, where
+// For /tmux-agents-switch: a session by its name, else a repository, where
 // tmux-claude-attach picks (one session: it; several: a picker).
 async function switchToQuery($: EngineInterface, query: string): Promise<string> {
   const worker = findSession(await listRows($), query)
@@ -255,7 +255,7 @@ let poll: { cancel: () => void } | undefined
 
 async function openPane($: EngineInterface): Promise<void> {
   await refresh($)
-  await $.ui.open({ id: PANE, title: 'Hub sessions', columns: PANE_COLUMNS })
+  await $.ui.open({ id: PANE, title: 'Agents', columns: PANE_COLUMNS })
   poll ??= $.clock.every(POLL_MS, () => refresh($))
 }
 
@@ -275,12 +275,12 @@ function short(path: string): string {
 
 // Only what a person does by hand; the rest the model does with the tools.
 const COMMANDS: CommandSpec[] = [
-  { name: 'session-hub', description: 'Open or close the hub sessions pane' },
+  { name: 'tmux-agents', description: 'Open or close the agents pane' },
   {
-    name: 'session-switch',
-    description: "Switch the screen to a session's tmux window, or to a repository's: /session-switch <session|repo>",
+    name: 'tmux-agents-switch',
+    description: "Switch the screen to a session's tmux window, or to a repository's: /tmux-agents-switch <session|repo>",
   },
-  { name: 'session-rm', description: 'Delete a background session and its worktree: /session-rm <session>' },
+  { name: 'tmux-agents-rm', description: 'Delete a background session and its worktree: /tmux-agents-rm <session>' },
 ]
 
 const TOOLS: ToolSpec[] = [
@@ -336,14 +336,14 @@ async function declare($: EngineInterface): Promise<void> {
     try {
       await $.command.register(command)
     } catch (err) {
-      $.ui.log(`session-hub: /${command.name} is not available: ${String(err)}`)
+      $.ui.log(`tmux-agents: /${command.name} is not available: ${String(err)}`)
     }
   }
   for (const tool of TOOLS) {
     try {
       await $.tool.register(tool)
     } catch (err) {
-      $.ui.log(`session-hub: ${tool.name} is not available: ${String(err)}`)
+      $.ui.log(`tmux-agents: ${tool.name} is not available: ${String(err)}`)
     }
   }
 }
@@ -364,42 +364,42 @@ export const register: Register = on => {
     return next(e)
   })
 
-  on('tool.call', { tool: 'mcp__session-hub__session-prepare' }, async ($, e: any) => {
+  on('tool.call', { tool: 'mcp__tmux-agents__session-prepare' }, async ($, e: any) => {
     const text = (v: unknown) => (typeof v === 'string' && v.trim() !== '' ? v : undefined)
     const args = { session: text(e.session), repo: text(e.repo), label: text(e.label) }
     return { result: await prepare($, args) }
-  }).catch(($, e, next) => ({ deny: `session-hub: session-prepare failed: ${String(next.error)}` }))
+  }).catch(($, e, next) => ({ deny: `tmux-agents: session-prepare failed: ${String(next.error)}` }))
 
-  on('tool.call', { tool: 'mcp__session-hub__session-list' }, async $ => {
+  on('tool.call', { tool: 'mcp__tmux-agents__session-list' }, async $ => {
     const rows = await listRows($)
     await update($, sessions, () => rows)
     // An array result is read as content blocks, so hand the rows over as text.
     return { result: JSON.stringify(rows.map(r => ({ ...r, repo: short(repoRoot(r.cwd)) })), null, 2) }
-  }).catch(($, e, next) => ({ deny: `session-hub: session-list failed: ${String(next.error)}` }))
+  }).catch(($, e, next) => ({ deny: `tmux-agents: session-list failed: ${String(next.error)}` }))
 
-  on('tool.call', { tool: 'mcp__session-hub__session-stop' }, async ($, e: any) => ({
+  on('tool.call', { tool: 'mcp__tmux-agents__session-stop' }, async ($, e: any) => ({
     result: await stopOrRemove($, 'stop', String(e.session ?? '')),
-  })).catch(($, e, next) => ({ deny: `session-hub: session-stop failed: ${String(next.error)}` }))
+  })).catch(($, e, next) => ({ deny: `tmux-agents: session-stop failed: ${String(next.error)}` }))
 
-  on('command.run', { command: 'session-hub' }, async $ => {
+  on('command.run', { command: 'tmux-agents' }, async $ => {
     if ((await $.ui.panes()).some(p => p.id === PANE)) {
       await $.ui.close({ id: PANE })
       stopPolling()
-      return { text: 'Hub sessions pane closed.' }
+      return { text: 'Agents pane closed.' }
     }
     await openPane($)
-    return { text: 'Hub sessions pane opened.' }
+    return { text: 'Agents pane opened.' }
   })
 
-  on('command.run', { command: 'session-switch' }, async ($, e) => {
+  on('command.run', { command: 'tmux-agents-switch' }, async ($, e) => {
     const query = e.args.trim()
-    if (!query) return { text: 'Usage: /session-switch <session|repo>' }
+    if (!query) return { text: 'Usage: /tmux-agents-switch <session|repo>' }
     return { text: await switchToQuery($, query) }
   })
 
-  on('command.run', { command: 'session-rm' }, async ($, e) => {
+  on('command.run', { command: 'tmux-agents-rm' }, async ($, e) => {
     const name = e.args.trim()
-    if (!name) return { text: 'Usage: /session-rm <session>' }
+    if (!name) return { text: 'Usage: /tmux-agents-rm <session>' }
     return { text: await stopOrRemove($, 'rm', name) }
   })
 

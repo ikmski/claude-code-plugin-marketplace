@@ -1,13 +1,15 @@
-# session-hub
+# tmux-agents
 
 agent view（`claude agents`）のバックグラウンドセッション（`claude --bg`）を、リポジトリごとの
 tmux session / window で扱うための mod。ペインで一覧を見て、行からそのセッションの window へ移る。
 モデルは一覧・window の用意・停止ができる。
 
 user scope で入れ、どのセッションでも使う。起動時はコマンドと遅延読み込みのツールを登録する
-だけで、何も動かさない。`/session-hub` でペインを開いたセッションが hub になり、ペインが
+だけで、何も動かさない。`/tmux-agents` でペインを開くと、そのセッションがペインを
 開いている間だけ一覧を 15 秒おきに読み直す（1 回ごとに `claude agents` を起動する。見えていなくても
 開いている限り続くので、使わないときはペインを閉じる）。
+
+session-hub から入れ替えるときは、`session-hub` をアンインストールしてから `tmux-agents` を入れる。
 
 バックグラウンドのセッションは `prefix A`（`tmux-claude-attach`）から「新しいセッション」として
 起動する。対話型の `claude` を `/bg` すると、セッション ID が変わるのに window の印
@@ -29,7 +31,7 @@ user scope で入れ、どのセッションでも使う。起動時はコマン
 
 ## できること
 
-一覧・window の用意・停止はどのセッションからでも言葉で頼め、モデルがツール（`mcp__session-hub__session-*`）を使う。
+一覧・window の用意・停止はどのセッションからでも言葉で頼め、モデルがツール（`mcp__tmux-agents__session-*`）を使う。
 人が打つコマンドは、ペインの開閉・画面の切り替え・削除の 3 つだけ。名前は 1 つずつ登録し、
 Claude Code に断られたものだけが欠けて、その旨を transcript に出す。
 
@@ -42,22 +44,22 @@ Claude Code に断られたものだけが欠けて、その旨を transcript �
   ユーザーの画面を切り替えずに用意し、どの session の何という window かを返す。セッション名を
   指定すればそのバックグラウンドセッションに attach し、省略すればリポジトリで新しいセッションを
   上の規則で起動してから attach する。
-- `/session-switch <session|repo>`（コマンド）: 同じように用意したうえで、人の画面をそこへ切り替える。
+- `/tmux-agents-switch <session|repo>`（コマンド）: 同じように用意したうえで、人の画面をそこへ切り替える。
   セッション名でなければリポジトリとして扱い、`tmux-claude-attach` が選ぶ（複数あれば選択の popup）。
-- バックグラウンドセッションの状態を出すドックペイン。`/session-hub` で開閉を切り替える（ペインの
+- バックグラウンドセッションの状態を出すドックペイン「Agents」。`/tmux-agents` で開閉を切り替える（ペインの
   閉じるマークや ctrl+x x でも閉じる）。ペインはリポジトリごとにまとめ（Claude Code の worktree
   `<repo>/.claude/worktrees/<name>` で動くセッションはそのリポジトリの下に出す）、行を押すとそのセッションの
   tmux window へ画面を切り替える。ペインには自分も出る。
 - 一覧: ツール `session-list`（`claude agents` の JSON）。
-- 片付け: `session-stop`（会話は残り、attach すると再開する）はツール、`/session-rm`（worktree ごと消す）は
+- 片付け: `session-stop`（会話は残り、attach すると再開する）はツール、`/tmux-agents-rm`（worktree ごと消す）は
   人が打つコマンドだけ。
   `rm` が push していないコミット等で断ったときは、その文言をそのまま返し、破棄のフラグは付けない。
 
-登録しているコマンド・ツール・フックの一覧は `claude plugin validate plugins/session-hub` が出す。
+登録しているコマンド・ツール・フックの一覧は `claude plugin validate plugins/tmux-agents` が出す。
 
 ## 確認
 
 ```bash
-claude plugin validate plugins/session-hub
-claude plugin test plugins/session-hub
+claude plugin validate plugins/tmux-agents
+claude plugin test plugins/tmux-agents
 ```

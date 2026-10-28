@@ -53,7 +53,7 @@ test('findSession prefers a running session of the name', () => {
 })
 
 const AGENTS: AgentRow[] = [
-  row({ sessionId: 'hub-id', name: 'hub', cwd: '/home/u/hub', kind: 'interactive' }),
+  row({ sessionId: 'me-id', name: 'me', cwd: '/home/u/notes', kind: 'interactive' }),
   row({ sessionId: 'w-id', name: 'ccwatch', cwd: '/home/u/develop/ikmski/ccwatch' }),
 ]
 
@@ -89,7 +89,7 @@ function engine(
   })
 }
 
-const PREPARE = 'mcp__session-hub__session-prepare'
+const PREPARE = 'mcp__tmux-agents__session-prepare'
 const detached = (runs: string[][]) => runs.filter(a => a[0] === 'tmux-claude-attach' || (a[0] === 'tmux-project' && a[1] !== '-l'))
 
 test('session-prepare puts a session, found by its name, in a window without switching', async ($, on) => {
@@ -172,10 +172,10 @@ test('without claude-session-name no session is started, under any other name', 
 test('a window keeps the name of its session', async ($, on) => {
   const runs: string[][] = []
   // @1 is ccwatch's under an old name, @2 already right, @3 a session no longer listed, @4 not Claude's.
-  const windows = ['@1\tw-id\told', '@2\thub-id\thub', '@3\tgone-id\tgone', '@4\t\tzsh', ''].join('\n')
+  const windows = ['@1\tw-id\told', '@2\tme-id\tme', '@3\tgone-id\tgone', '@4\t\tzsh', ''].join('\n')
   engine(on, AGENTS, runs, undefined, windows)
 
-  await $.tool.call({ tool: 'mcp__session-hub__session-stop', session: 'ccwatch' } as any)
+  await $.tool.call({ tool: 'mcp__tmux-agents__session-stop', session: 'ccwatch' } as any)
 
   expect(runs.filter(a => a[1] === 'rename-window')).toEqual([['tmux', 'rename-window', '-t', '@1', 'ccwatch']])
 })
@@ -190,12 +190,12 @@ test('session-prepare to a session nobody has opens nothing', async ($, on) => {
   expect(detached(runs)).toEqual([])
 })
 
-test('/session-switch goes to a session by its name, else to a repository', async ($, on) => {
+test('/tmux-agents-switch goes to a session by its name, else to a repository', async ($, on) => {
   const runs: string[][] = []
   engine(on, AGENTS, runs)
 
-  await $.command.run({ command: 'session-switch', args: 'ccwatch' } as any)
-  await $.command.run({ command: 'session-switch', args: 'ikmski/tmp' } as any)
+  await $.command.run({ command: 'tmux-agents-switch', args: 'ccwatch' } as any)
+  await $.command.run({ command: 'tmux-agents-switch', args: 'ikmski/tmp' } as any)
 
   expect(runs.filter(a => a[0] === 'tmux-claude-attach')).toEqual([
     ['tmux-claude-attach', '-t', 'ccwatch', '-i', 'w-id', '-c', '/dev/pts/1'],
@@ -208,11 +208,11 @@ test('/session-switch goes to a session by its name, else to a repository', asyn
 })
 
 const PANE = {
-  plugin: 'session-hub',
+  plugin: 'tmux-agents',
   component: 'Pane',
-  requestId: 'hub-sessions',
+  requestId: 'tmux-agents',
   props: {
-    title: 'Hub sessions',
+    title: 'Agents',
     isFocused: false,
     bodyColumns: 60,
     placement: 'dock',
@@ -235,7 +235,7 @@ test('the pane lists background sessions under their repository, on every surfac
     },
   }))
   // session-list stores what it read, which is what the pane draws.
-  await $.tool.call({ tool: 'mcp__session-hub__session-list' } as any)
+  await $.tool.call({ tool: 'mcp__tmux-agents__session-list' } as any)
 
   for (const surface of ['terminal', 'desktop'] as const) {
     const ui = await $.ui.mount({ ...PANE, surface })
@@ -254,7 +254,7 @@ test('pressing a session in the pane switches to its tmux window', async ($, on)
     toasts.push(e.text)
     return { value: undefined }
   })
-  await $.tool.call({ tool: 'mcp__session-hub__session-list' } as any)
+  await $.tool.call({ tool: 'mcp__tmux-agents__session-list' } as any)
 
   const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
   await ui.press({ key: 'w-id' })
@@ -267,14 +267,14 @@ test('pressing a session in the pane switches to its tmux window', async ($, on)
   expect(toasts).toEqual(['Opened ccwatch in tmux.'])
 })
 
-test('/session-hub opens the pane narrow, and closes it when it is open', async ($, on) => {
+test('/tmux-agents opens the pane narrow, and closes it when it is open', async ($, on) => {
   const opened: any[] = []
   const closed: any[] = []
   let isOpen = false
   mock.clock(on)
   claudeOnly(on, [], () => ({ exitCode: 0 }))
   on('ui.panes', () => ({
-    value: isOpen ? [{ id: 'hub-sessions', title: 'Hub sessions', isShown: true, isFocused: false, isPlaced: true }] : [],
+    value: isOpen ? [{ id: 'tmux-agents', title: 'Agents', isShown: true, isFocused: false, isPlaced: true }] : [],
   }))
   on('ui.open', (_: unknown, e: any) => {
     opened.push(e)
@@ -287,11 +287,11 @@ test('/session-hub opens the pane narrow, and closes it when it is open', async 
     return { value: undefined }
   })
 
-  expect((await $.command.run({ command: 'session-hub' } as any)).text).toBe('Hub sessions pane opened.')
-  expect(opened).toEqual([{ id: 'hub-sessions', title: 'Hub sessions', columns: 32 }])
-  expect((await $.command.run({ command: 'session-hub' } as any)).text).toBe('Hub sessions pane closed.')
-  expect(closed.map(e => e.id)).toEqual(['hub-sessions'])
-  expect((await $.command.run({ command: 'session-hub' } as any)).text).toBe('Hub sessions pane opened.')
+  expect((await $.command.run({ command: 'tmux-agents' } as any)).text).toBe('Agents pane opened.')
+  expect(opened).toEqual([{ id: 'tmux-agents', title: 'Agents', columns: 32 }])
+  expect((await $.command.run({ command: 'tmux-agents' } as any)).text).toBe('Agents pane closed.')
+  expect(closed.map(e => e.id)).toEqual(['tmux-agents'])
+  expect((await $.command.run({ command: 'tmux-agents' } as any)).text).toBe('Agents pane opened.')
 })
 
 // The pane as the engine keeps it, and the `claude agents` runs that poll it.
@@ -301,7 +301,7 @@ function paneEngine(on: any) {
   let isOpen = false
   claudeOnly(on, runs, () => ({ exitCode: 0 }))
   on('ui.panes', () => ({
-    value: isOpen ? [{ id: 'hub-sessions', title: 'Hub sessions', isShown: true, isFocused: false, isPlaced: true }] : [],
+    value: isOpen ? [{ id: 'tmux-agents', title: 'Agents', isShown: true, isFocused: false, isPlaced: true }] : [],
   }))
   on('ui.open', () => {
     isOpen = true
@@ -318,12 +318,12 @@ function paneEngine(on: any) {
 test('the list is polled only while the pane is open', async ($, on) => {
   const { clock, polls } = paneEngine(on)
 
-  await $.command.run({ command: 'session-hub' } as any)
+  await $.command.run({ command: 'tmux-agents' } as any)
   expect(polls()).toBe(1)
   await clock.advance(15_000 * 2)
   expect(polls()).toBe(3)
 
-  await $.command.run({ command: 'session-hub' } as any)
+  await $.command.run({ command: 'tmux-agents' } as any)
   await clock.advance(15_000 * 4)
   expect(polls()).toBe(3)
 })
@@ -336,7 +336,7 @@ test('a state change of a session raises no toast', async ($, on) => {
     return { value: undefined }
   })
 
-  await $.command.run({ command: 'session-hub' } as any)
+  await $.command.run({ command: 'tmux-agents' } as any)
   WORKER.state = 'done'
   await clock.advance(15_000)
   WORKER.state = 'working'
@@ -359,7 +359,7 @@ test('paneGroups groups by directory, working first and stopped last', () => {
   ])
 })
 
-const BG_HUB = row({ sessionId: 'hub-id', id: 'hub', name: 'hub', cwd: '/home/u/hub' })
+const BG_SELF = row({ sessionId: 'me-id', id: 'me', name: 'me', cwd: '/home/u/notes' })
 const WORKER = row({ sessionId: 'w-id', id: 'w', name: 'ccwatch', cwd: '/home/u/develop/ikmski/ccwatch', state: 'working' })
 
 function claudeOnly(on: any, runs: string[][], answer: (argv: string[]) => { exitCode: number; stdout?: string; stderr?: string }) {
@@ -367,7 +367,7 @@ function claudeOnly(on: any, runs: string[][], answer: (argv: string[]) => { exi
     runs.push([...e.argv])
     const out =
       e.argv[1] === 'agents'
-        ? { exitCode: 0, stdout: JSON.stringify([BG_HUB, WORKER]) }
+        ? { exitCode: 0, stdout: JSON.stringify([BG_SELF, WORKER]) }
         : e.argv[1] === 'list-windows'
           ? { exitCode: 0 }
           : answer(e.argv)
@@ -375,7 +375,7 @@ function claudeOnly(on: any, runs: string[][], answer: (argv: string[]) => { exi
   })
 }
 
-const STOP = 'mcp__session-hub__session-stop'
+const STOP = 'mcp__tmux-agents__session-stop'
 
 test('session-stop stops the named session by its id', async ($, on) => {
   const runs: string[][] = []
@@ -391,26 +391,26 @@ test('session-stop to a session nobody has lists the sessions', async ($, on) =>
   claudeOnly(on, runs, () => ({ exitCode: 0 }))
 
   const ran: any = await $.tool.call({ tool: STOP, session: 'nope' } as any)
-  expect(ran.result).toBe('No session named "nope". Sessions: hub, ccwatch')
+  expect(ran.result).toBe('No session named "nope". Sessions: me, ccwatch')
   expect(runs.some(a => a[1] === 'stop')).toBe(false)
 })
 
-test('/session-rm passes on a refusal word for word and adds no flag that overrides it', async ($, on) => {
+test('/tmux-agents-rm passes on a refusal word for word and adds no flag that overrides it', async ($, on) => {
   const runs: string[][] = []
   claudeOnly(on, runs, () => ({ exitCode: 1, stderr: 'has unpushed commits: pass --discard-unpushed abc@wt\n' }))
 
-  const text = (await $.command.run({ command: 'session-rm', args: 'ccwatch' } as any)).text
+  const text = (await $.command.run({ command: 'tmux-agents-rm', args: 'ccwatch' } as any)).text
   expect(text).toBe('claude rm ccwatch failed: has unpushed commits: pass --discard-unpushed abc@wt')
   expect(runs.filter(a => a[1] === 'rm')).toEqual([['claude', 'rm', 'w']])
 })
 
-test('the pane lists the hub itself too when it is a background session', async ($, on) => {
+test('the pane lists this session too when it is a background session', async ($, on) => {
   claudeOnly(on, [], () => ({ exitCode: 0 }))
-  await $.tool.call({ tool: 'mcp__session-hub__session-list' } as any)
+  await $.tool.call({ tool: 'mcp__tmux-agents__session-list' } as any)
 
   const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
   expect((await ui.find({ type: 'Text', text: /● ccwatch/ }))?.text).toBe(' ● ccwatch')
-  expect((await ui.find({ type: 'Text', text: /○ hub/ }))?.text).toBe(' ○ hub')
+  expect((await ui.find({ type: 'Text', text: /○ me/ }))?.text).toBe(' ○ me')
   await ui.unmount()
 })
 
@@ -423,13 +423,13 @@ test('session start registers the commands and deferred tools, and runs nothing'
   claudeOnly(on, runs, () => ({ exitCode: 0 }))
   on('session.start', (_: unknown, e: any) => ({ cwd: e.cwd }))
   on('command.register', (_: unknown, e: any) => {
-    if (e.name === 'session-switch') throw new Error(`"/${e.name}" refused: it is a built-in`)
+    if (e.name === 'tmux-agents-switch') throw new Error(`"/${e.name}" refused: it is a built-in`)
     commands.push(e.name)
     return { value: { command: e.name } }
   })
   on('tool.register', (_: unknown, e: any) => {
     tools.push(e)
-    return { value: { tool: `mcp__session-hub__${e.name}` } }
+    return { value: { tool: `mcp__tmux-agents__${e.name}` } }
   })
   on('ui.log', (_: unknown, e: any) => {
     logs.push(e.text)
@@ -440,11 +440,11 @@ test('session start registers the commands and deferred tools, and runs nothing'
     return { value: { isPlaced: true } }
   })
 
-  await $.session.start({ cwd: '/home/u/hub', surface: null, isInteractive: false } as any)
+  await $.session.start({ cwd: '/home/u/notes', surface: null, isInteractive: false } as any)
 
-  // A refused name (session-switch here) drops only itself.
-  expect(commands).toEqual(['session-hub', 'session-rm'])
-  expect(logs.some(l => l.includes('/session-switch'))).toBe(true)
+  // A refused name (tmux-agents-switch here) drops only itself.
+  expect(commands).toEqual(['tmux-agents', 'tmux-agents-rm'])
+  expect(logs.some(l => l.includes('/tmux-agents-switch'))).toBe(true)
   expect(tools.map(t => t.name)).toEqual(['session-prepare', 'session-stop', 'session-list'])
   expect(tools.every(t => t.isDeferred === true)).toBe(true)
   expect(opened).toEqual([])
