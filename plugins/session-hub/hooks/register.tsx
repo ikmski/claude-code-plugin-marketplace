@@ -43,25 +43,21 @@ export function resolveRepo(repos: Repo[], query: string): Repo | string {
   return `"${q}" matches several repositories: ${partial.map(r => r.path).join(', ')}`
 }
 
-// tmux takes `.` and `:` in a target as separators.
-const sanitize = (s: string) => s.trim().replace(/\s+/g, '-').replace(/[.:]/g, '_')
-
-// The label alone: the pane shows a session under its repository, and the
-// name is also its tmux window's. A session is addressed by its name alone
-// (session-dispatch, SendMessage), so a name any session has gets -2, -3 ...;
-// with no label, 1, 2 ...
-export function newSessionName(rows: AgentRow[], label = ''): string {
-  const stem = sanitize(label)
-  const taken = new Set(rows.map(r => r.name))
-  if (stem === '') {
-    let n = 1
-    while (taken.has(String(n))) n++
-    return String(n)
+// claude-session-name (nix-config) owns the naming rule, so a session started
+// here and one started from tmux-claude-attach are named alike; it is handed
+// the rows already read, not to list them twice. Without it no session is
+// started under another name: the rule would be in two places, and a name it
+// did not give could be one already addressed. Answers why not when it could not.
+async function newSessionName($: EngineInterface, rows: AgentRow[], label = ''): Promise<{ name: string } | string> {
+  let ran
+  try {
+    ran = await $.process.run(['claude-session-name', label], { stdin: JSON.stringify(rows) })
+  } catch (err) {
+    return `claude-session-name を実行できないので、新しいセッションは起動しません（nix-config が ~/.local/bin に置きます）: ${String(err)}`
   }
-  if (!taken.has(stem)) return stem
-  let n = 2
-  while (taken.has(`${stem}-${n}`)) n++
-  return `${stem}-${n}`
+  const name = ran.stdout.trim()
+  if (ran.exitCode === 0 && name) return { name }
+  return `Could not name a new session: ${ran.stderr.trim() || 'claude-session-name printed nothing'}`
 }
 
 // A session in a worktree Claude Code made (`<repo>/.claude/worktrees/<name>`)
@@ -128,6 +124,23 @@ async function refresh($: EngineInterface): Promise<void> {
   }
   await update($, sessions, () => rows)
   await update($, error, () => '')
+  try {
+    await renameWindows($, rows)
+  } catch {
+    // Without tmux there is no window to keep up to date.
+  }
+}
+
+// tmux-claude-attach marks a session's window with the window option
+// @claude_session (its sessionId) and names it after the session; a name
+// changed since is carried over here.
+async function renameWindows($: EngineInterface, rows: AgentRow[]): Promise<void> {
+  const ran = await $.process.run(['tmux', 'list-windows', '-a', '-F', '#{window_id}\t#{@claude_session}\t#{window_name}'])
+  if (ran.exitCode !== 0) return
+  for (const [id, sid, name] of ran.stdout.split('\n').map(line => line.split('\t'))) {
+    const row = rows.find(r => r.sessionId === sid)
+    if (id && row && row.name !== name) await $.process.run(['tmux', 'rename-window', '-t', id, row.name])
+  }
 }
 
 function label(row: AgentRow): string {
@@ -173,7 +186,9 @@ export async function dispatch($: EngineInterface, args: DispatchArgs): Promise<
   if (!args.repo) return 'Name a repository to start a session in, or a session to send to.'
   const repo = resolveRepo(await listRepos($), args.repo)
   if (typeof repo === 'string') return repo
-  const name = newSessionName(rows, args.label)
+  const named = await newSessionName($, rows, args.label)
+  if (typeof named === 'string') return named
+  const { name } = named
   const failed = await start($, repo.path, name, [text])
   if (failed) return failed
   return `Started ${name} in ${repo.path}. Follow up with session "${name}".${warn}`
@@ -191,7 +206,7 @@ export type PrepareArgs = { session?: string; repo?: string; label?: string }
 
 // For the model: the user's screen stays where it is. A session is found by
 // its name, which newSessionName keeps unique; without one, a new session is
-// started in `repo` under this mod's naming (not tmux-claude-attach's -n).
+// started here in `repo` under the name claude-session-name gives.
 export async function prepare($: EngineInterface, args: PrepareArgs): Promise<string> {
   const rows = await listRows($)
   if (args.session) {
@@ -202,7 +217,9 @@ export async function prepare($: EngineInterface, args: PrepareArgs): Promise<st
   if (!args.repo) return 'Name a session to put in tmux, or a repository to start one in.'
   const repo = resolveRepo(await listRepos($), args.repo)
   if (typeof repo === 'string') return repo
-  const name = newSessionName(rows, args.label)
+  const named = await newSessionName($, rows, args.label)
+  if (typeof named === 'string') return named
+  const { name } = named
   const failed = await start($, repo.path, name, [])
   if (failed) return failed
   const started = findSession(await read($, sessions), name)

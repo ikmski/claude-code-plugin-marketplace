@@ -14,8 +14,11 @@ user scope で入れ、どのセッションでも使う。起動時はコマン
 
 ## 前提
 
-- `tmux-project` と `tmux-claude-attach` が PATH にあること。どちらも ikmski/nix-config が
+- `claude-session-name`・`tmux-project`・`tmux-claude-attach` が PATH にあること。どれも ikmski/nix-config が
   `~/.local/bin` に置く。この mod が使うのは次の形:
+  - `claude-session-name [LABEL]`: 新しいセッションの名前を出す。名前の規則はここが持ち、使われている名前は
+    `claude agents --json --all` の一覧を stdin で渡す。無ければ新しいセッションは起動しない（代わりの名前でも
+    起動しない）。既にあるセッションへの依頼・切り替え・停止・ログは動く
   - `tmux-project -l`: リポジトリの候補
   - `tmux-project -d <path>`: tmux session を用意するだけで client を切り替えず、session 名を出す
   - `tmux-claude-attach -d -t <session> -i <sessionId>`: window を作るだけで
@@ -34,11 +37,11 @@ Claude Code に断られたものだけが欠けて、その旨を transcript �
 
 - `session-dispatch`（ツール）: 1 リポジトリに複数のセッションを持てる。セッション名を
   指定しなければリポジトリで新しいセッションを起動し、指定すればそのセッションへ送る（止まっていれば再開する）。
-- 新しいセッションの名前は用途（`review`、`aws-s3` など。依頼からモデルが付ける）だけで、リポジトリ名は
-  含めない。リポジトリはペインの見出しに出る。名前は tmux の window 名にもなる。セッションは名前だけで
-  指す（依頼の宛先・SendMessage の返信先）ので、どのリポジトリのものであれ同じ名前があれば `-2`, `-3` …、
-  用途が無ければ `1`, `2` … とする。`prefix A` の「新しいセッション」は `tmux-claude-attach`（nix-config）が
-  名前を付けるので、この規則に従わない。
+- 新しいセッションの名前は用途（`review`、`aws-s3` など。依頼からモデルが付ける）から
+  `claude-session-name` が付ける。`prefix A` の「新しいセッション」も同じものを使うので、同じ名前の付き方になる。
+  リポジトリ名は含めず、リポジトリはペインの見出しに出る。
+- 名前は tmux の window 名にもなる。あとで名前が変わっても、attach したときとペインが一覧を読み直すたびに
+  window 名が追従する。
 - `session-prepare`（ツール）: Claude session の window を、そのリポジトリの tmux session に
   ユーザーの画面を切り替えずに用意し、どの session の何という window かを返す。セッション名を
   指定すればそのバックグラウンドセッションに attach し、省略すればリポジトリで新しいセッションを

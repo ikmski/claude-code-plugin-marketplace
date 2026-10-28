@@ -1,7 +1,7 @@
 import { expect, mock, test } from 'claude-code/testing'
 
 import type { AgentRow } from '../types'
-import { findSession, newSessionName, paneGroups, parseRepos, repoRoot, resolveRepo } from './register'
+import { findSession, paneGroups, parseRepos, repoRoot, resolveRepo } from './register'
 
 const REPOS = parseRepos(
   [
@@ -38,20 +38,6 @@ test('resolveRepo takes a name, a path or a unique part of a path', () => {
   expect(resolveRepo(REPOS, 'nothing')).toMatch(/No repository/)
 })
 
-test('newSessionName is the label alone, numbered when any session has it', () => {
-  expect(newSessionName([], 'review')).toBe('review')
-  expect(newSessionName([], ' aws s3.log ')).toBe('aws-s3_log')
-  // Taken in another repository counts too: names are addressed alone.
-  const one = [row({ name: 'review', cwd: '/home/u/develop/ikmski/other' })]
-  expect(newSessionName(one, 'review')).toBe('review-2')
-  expect(newSessionName([...one, row({ name: 'review-2' })], 'review')).toBe('review-3')
-})
-
-test('newSessionName without a label numbers from 1', () => {
-  expect(newSessionName([])).toBe('1')
-  expect(newSessionName([row({ name: '1' }), row({ name: '2' })], '  ')).toBe('3')
-})
-
 test('repoRoot shows a worktree session under its repository', () => {
   expect(repoRoot('/home/u/develop/ikmski/ccwatch/.claude/worktrees/fix-x')).toBe('/home/u/develop/ikmski/ccwatch')
   expect(repoRoot('/home/u/develop/ikmski/ccwatch')).toBe('/home/u/develop/ikmski/ccwatch')
@@ -71,24 +57,36 @@ const AGENTS: AgentRow[] = [
   row({ sessionId: 'w-id', name: 'ccwatch', cwd: '/home/u/develop/ikmski/ccwatch' }),
 ]
 
-function engine(on: any, agents: AgentRow[], runs: string[][], sent: any[], onRun?: (argv: string[]) => void) {
+// `windows` is what `tmux list-windows -a` prints: "<window_id>\t<@claude_session>\t<name>".
+function engine(
+  on: any,
+  agents: AgentRow[],
+  runs: string[][],
+  sent: any[],
+  onRun?: (argv: string[], init?: { stdin?: string }) => void,
+  windows = '',
+) {
   on('session.id', () => ({ value: 'hub-id' }))
   on('process.run', (_: unknown, e: any) => {
     runs.push([...e.argv])
-    onRun?.(e.argv)
+    onRun?.(e.argv, e.init)
     const [cmd, sub] = e.argv
     const stdout =
       cmd === 'tmux-project' && sub === '-l'
         ? REPOS.map(r => `  ${r.name}\t${r.path}`).join('\n')
         : cmd === 'tmux-project' && sub === '-d'
           ? 'ccwatch\n'
-          : cmd === 'tmux-claude-attach'
-            ? 'claude-w\n'
-            : cmd === 'tmux' && sub === 'display-message'
-              ? '/dev/pts/1\n'
-            : cmd === 'claude' && sub === 'agents'
-              ? JSON.stringify(agents)
-              : ''
+          : cmd === 'claude-session-name'
+            ? `${sub || '1'}\n`
+            : cmd === 'tmux-claude-attach'
+              ? 'claude-w\n'
+              : cmd === 'tmux' && sub === 'display-message'
+                ? '/dev/pts/1\n'
+                : cmd === 'tmux' && sub === 'list-windows'
+                  ? windows
+                  : cmd === 'claude' && sub === 'agents'
+                    ? JSON.stringify(agents)
+                    : ''
     return { value: { exitCode: 0, stdout, stderr: '' } }
   })
   on('session.send', (_: unknown, e: any) => {
@@ -115,11 +113,19 @@ test('dispatch sends to the session it is named', async ($, on) => {
 test('dispatch starts a session when none works there', async ($, on) => {
   const runs: string[][] = []
   const sent: any[] = []
-  engine(on, [AGENTS[0]!], runs, sent)
+  const stdins: (string | undefined)[] = []
+  engine(on, [AGENTS[0]!], runs, sent, (argv, init) => {
+    if (argv[0] === 'claude-session-name') stdins.push(init?.stdin)
+  })
 
   const ran: any = await $.tool.call({ tool: DISPATCH, repo: 'ikmski/tmp', task: 'clean up', label: 'cleanup' } as any)
 
   expect(ran.result).toMatch(/^Started cleanup in \/home\/u\/develop\/ikmski\/tmp/)
+  // The name is the one claude-session-name gives for the label, handed the
+  // rows already read rather than listing them again.
+  expect(runs.filter(a => a[0] === 'claude-session-name')).toEqual([['claude-session-name', 'cleanup']])
+  expect(stdins).toEqual([JSON.stringify([AGENTS[0]])])
+  expect(runs.slice(0, runs.findIndex(a => a[1] === '--bg')).filter(a => a[1] === 'agents').length).toBe(1)
   const bg = runs.find(a => a.includes('--bg'))!
   expect(bg.slice(0, 4)).toEqual(['claude', '--bg', '--name', 'cleanup'])
   expect(bg[4]).toMatch(/clean up[\s\S]*hub/)
@@ -214,10 +220,63 @@ test('session-prepare without a session starts one named by its label, then puts
   const ran: any = await $.tool.call({ tool: PREPARE, repo: 'ccwatch', label: 'review' } as any)
 
   expect(runs.find(a => a[1] === '--bg')).toEqual(['claude', '--bg', '--name', 'review'])
+  expect(runs.filter(a => a[0] === 'claude-session-name')).toEqual([['claude-session-name', 'review']])
   expect(runs.filter(a => a[0] === 'tmux-claude-attach')).toEqual([
     ['tmux-claude-attach', '-t', 'ccwatch', '-d', '-i', 'new-id'],
   ])
   expect(ran.result).toMatch(/に出した/)
+})
+
+// tmux-project -l answers the repositories; claude-session-name as `name` says.
+function namingEngine(on: any, runs: string[][], name: (argv: string[]) => { exitCode: number; stdout?: string; stderr?: string }) {
+  claudeOnly(on, runs, argv =>
+    argv[0] === 'claude-session-name'
+      ? name(argv)
+      : argv[1] === '-l'
+        ? { exitCode: 0, stdout: REPOS.map(r => `  ${r.name}\t${r.path}`).join('\n') }
+        : { exitCode: 0 },
+  )
+}
+
+test('a new session is not started when claude-session-name cannot name it', async ($, on) => {
+  const runs: string[][] = []
+  namingEngine(on, runs, () => ({ exitCode: 1, stderr: 'jq: parse error\n' }))
+
+  const ran: any = await $.tool.call({ tool: DISPATCH, repo: 'ccwatch', task: 'x', label: 'review' } as any)
+
+  expect(ran.result).toBe('Could not name a new session: jq: parse error')
+  expect(runs.some(a => a[1] === '--bg')).toBe(false)
+})
+
+test('without claude-session-name no session is started, under any other name', async ($, on) => {
+  const runs: string[][] = []
+  // A throwing hook makes process.run reject, as a command that cannot start does.
+  namingEngine(on, runs, () => {
+    throw new Error('claude-session-name: command not found')
+  })
+  on('session.send', () => ({ isDelivered: true }))
+
+  const dispatched: any = await $.tool.call({ tool: DISPATCH, repo: 'ccwatch', task: 'x', label: 'review' } as any)
+  const prepared: any = await $.tool.call({ tool: PREPARE, repo: 'ccwatch', label: 'review' } as any)
+
+  for (const ran of [dispatched, prepared]) {
+    expect(ran.result).toMatch(/^claude-session-name を実行できないので、新しいセッションは起動しません/)
+  }
+  expect(runs.some(a => a[1] === '--bg')).toBe(false)
+  // What needs no new name still works.
+  const sent: any = await $.tool.call({ tool: DISPATCH, session: 'ccwatch', task: 'x' } as any)
+  expect(sent.result).toMatch(/^Sent to ccwatch/)
+})
+
+test('a window keeps the name of its session', async ($, on) => {
+  const runs: string[][] = []
+  // @1 is ccwatch's under an old name, @2 already right, @3 a session no longer listed, @4 not Claude's.
+  const windows = ['@1\tw-id\told', '@2\thub-id\thub', '@3\tgone-id\tgone', '@4\t\tzsh', ''].join('\n')
+  engine(on, AGENTS, runs, [], undefined, windows)
+
+  await $.tool.call({ tool: 'mcp__session-hub__session-stop', session: 'ccwatch' } as any)
+
+  expect(runs.filter(a => a[1] === 'rename-window')).toEqual([['tmux', 'rename-window', '-t', '@1', 'ccwatch']])
 })
 
 test('session-prepare to a session nobody has opens nothing', async ($, on) => {
@@ -272,10 +331,10 @@ const PANE = {
 
 test('the pane lists background sessions under their repository, on every surface', async ($, on) => {
   on('session.id', () => ({ value: 'hub-id' }))
-  on('process.run', () => ({
+  on('process.run', (_: unknown, e: any) => ({
     value: {
       exitCode: 0,
-      stdout: JSON.stringify([
+      stdout: e.argv[1] === 'list-windows' ? '' : JSON.stringify([
         AGENTS[0],
         row({ sessionId: 'w', name: 'ccwatch', cwd: '/home/u/develop/ikmski/ccwatch', state: 'working' }),
       ]),
@@ -416,7 +475,12 @@ function claudeOnly(on: any, runs: string[][], answer: (argv: string[]) => { exi
   on('session.id', () => ({ value: 'hub-id' }))
   on('process.run', (_: unknown, e: any) => {
     runs.push([...e.argv])
-    const out = e.argv[1] === 'agents' ? { exitCode: 0, stdout: JSON.stringify([BG_HUB, WORKER]) } : answer(e.argv)
+    const out =
+      e.argv[1] === 'agents'
+        ? { exitCode: 0, stdout: JSON.stringify([BG_HUB, WORKER]) }
+        : e.argv[1] === 'list-windows'
+          ? { exitCode: 0 }
+          : answer(e.argv)
     return { value: { stdout: '', stderr: '', ...out } }
   })
 }
