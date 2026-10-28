@@ -1,7 +1,8 @@
 # session-hub
 
-Claude Code のセッションから、`~/develop/<org>/<repo>/` ごとのバックグラウンドセッション
-（`claude --bg`）へタスクを依頼し、その一覧をペインで見てセッション間を移るための mod。
+agent view（`claude agents`）のバックグラウンドセッション（`claude --bg`）を、リポジトリごとの
+tmux session / window で扱うための mod。ペインで一覧を見て、行からそのセッションの window へ移る。
+モデルは一覧・window の用意・停止ができる。
 
 user scope で入れ、どのセッションでも使う。起動時はコマンドと遅延読み込みのツールを登録する
 だけで、何も動かさない。`/session-hub` でペインを開いたセッションが hub になり、ペインが
@@ -18,26 +19,21 @@ user scope で入れ、どのセッションでも使う。起動時はコマン
   `~/.local/bin` に置く。この mod が使うのは次の形:
   - `claude-session-name [LABEL]`: 新しいセッションの名前を出す。名前の規則はここが持ち、使われている名前は
     `claude agents --json --all` の一覧を stdin で渡す。無ければ新しいセッションは起動しない（代わりの名前でも
-    起動しない）。既にあるセッションへの依頼・切り替え・停止・ログは動く
+    起動しない）。既にあるセッションの window の用意・切り替え・停止は動く
   - `tmux-project -l`: リポジトリの候補
   - `tmux-project -d <path>`: tmux session を用意するだけで client を切り替えず、session 名を出す
   - `tmux-claude-attach -d -t <session> -i <sessionId>`: window を作るだけで
     切り替えず、window 名を出す
   - `tmux-claude-attach -t <session> [-i <sessionId>] -c <client>`: ユーザーの client を
-    その window へ切り替える。hub はバックグラウンドで tmux の外にいるため、client は明示する
-- 依頼文には「終わったら SendMessage で <依頼元> へ返す」が付く。`<依頼元>` は依頼した時点の
-  セッション名で、`claude --bg` で argv から起動したセッションは返信先を知らないため。
-  名前が取れないときは返信先を付けずに送り、そう伝える。
+    その window へ切り替える。この mod を動かすセッションは tmux の外にいることもあるため、client は明示する
 
 ## できること
 
-依頼・一覧・停止・ログはどのセッションからでも言葉で頼め、モデルがツール（`mcp__session-hub__session-*`）を使う。
+一覧・window の用意・停止はどのセッションからでも言葉で頼め、モデルがツール（`mcp__session-hub__session-*`）を使う。
 人が打つコマンドは、ペインの開閉・画面の切り替え・削除の 3 つだけ。名前は 1 つずつ登録し、
 Claude Code に断られたものだけが欠けて、その旨を transcript に出す。
 
-- `session-dispatch`（ツール）: 1 リポジトリに複数のセッションを持てる。セッション名を
-  指定しなければリポジトリで新しいセッションを起動し、指定すればそのセッションへ送る（止まっていれば再開する）。
-- 新しいセッションの名前は用途（`review`、`aws-s3` など。依頼からモデルが付ける）から
+- 1 リポジトリに複数のセッションを持てる。新しいセッションの名前は用途（`review`、`aws-s3` など。モデルが付ける）から
   `claude-session-name` が付ける。`prefix A` の「新しいセッション」も同じものを使うので、同じ名前の付き方になる。
   リポジトリ名は含めず、リポジトリはペインの見出しに出る。
 - 名前は tmux の window 名にもなる。あとで名前が変わっても、attach したときとペインが一覧を読み直すたびに
@@ -53,8 +49,8 @@ Claude Code に断られたものだけが欠けて、その旨を transcript �
   `<repo>/.claude/worktrees/<name>` で動くセッションはそのリポジトリの下に出す）、行を押すとそのセッションの
   tmux window へ画面を切り替える。ペインには自分も出る。
 - 一覧: ツール `session-list`（`claude agents` の JSON）。
-- 片付けと結果の確認: `session-stop`（会話は残り、依頼すると再開する）・`session-logs`
-  （`claude logs` の末尾）はツール、`/session-rm`（worktree ごと消す）は人が打つコマンドだけ。
+- 片付け: `session-stop`（会話は残り、attach すると再開する）はツール、`/session-rm`（worktree ごと消す）は
+  人が打つコマンドだけ。
   `rm` が push していないコミット等で断ったときは、その文言をそのまま返し、破棄のフラグは付けない。
 
 登録しているコマンド・ツール・フックの一覧は `claude plugin validate plugins/session-hub` が出す。

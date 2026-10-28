@@ -47,7 +47,8 @@ export function resolveRepo(repos: Repo[], query: string): Repo | string {
 // here and one started from tmux-claude-attach are named alike; it is handed
 // the rows already read, not to list them twice. Without it no session is
 // started under another name: the rule would be in two places, and a name it
-// did not give could be one already addressed. Answers why not when it could not.
+// did not give could be one another session has, while a session is found by
+// its name alone. Answers why not when it could not.
 async function newSessionName($: EngineInterface, rows: AgentRow[], label = ''): Promise<{ name: string } | string> {
   let ran
   try {
@@ -147,57 +148,10 @@ function label(row: AgentRow): string {
   return row.state ?? row.status
 }
 
-// The reply address is this session's name as it is listed now. A session
-// started from argv has no sender to reply to, so the task has to name one.
-async function hubName($: EngineInterface, rows: AgentRow[]): Promise<string | undefined> {
-  const me = await $.session.id()
-  return rows.find(r => r.sessionId === me)?.name
-}
-
-export type DispatchArgs = { task: string; repo?: string; session?: string; label?: string }
-
-// Without `session` a new session is started in `repo`; with it the task goes
-// to that session (resumed when stopped).
-export async function dispatch($: EngineInterface, args: DispatchArgs): Promise<string> {
-  const rows = await listRows($)
-  const hub = await hubName($, rows)
-  const text = hub
-    ? `${args.task}\n\n終わったら SendMessage で ${hub} へ結果を返してください。`
-    : args.task
-  const warn = hub ? '' : '\n(このセッションの名前が取れないため、依頼文に返信先を付けていません)'
-
-  if (args.session) {
-    const worker = findSession(rows, args.session)
-    if (!worker) return noSession(rows, args.session)
-    if (isStopped(worker)) {
-      const ran = await $.process.run(['claude', '--resume', worker.sessionId, '--bg', text], {
-        cwd: worker.cwd,
-      })
-      await refresh($)
-      if (ran.exitCode !== 0) return `Could not resume ${worker.name}: ${ran.stderr.trim()}`
-      return `Resumed ${worker.name} (${worker.cwd}).${warn}`
-    }
-    const sent = await $.session.send({ to: { sessionId: worker.sessionId }, text })
-    if (!sent.isDelivered) return `Not delivered to ${worker.name}: ${sent.reason}`
-    await refresh($)
-    return `Sent to ${worker.name} (${worker.cwd}).${warn}`
-  }
-
-  if (!args.repo) return 'Name a repository to start a session in, or a session to send to.'
-  const repo = resolveRepo(await listRepos($), args.repo)
-  if (typeof repo === 'string') return repo
-  const named = await newSessionName($, rows, args.label)
-  if (typeof named === 'string') return named
-  const { name } = named
-  const failed = await start($, repo.path, name, [text])
-  if (failed) return failed
-  return `Started ${name} in ${repo.path}. Follow up with session "${name}".${warn}`
-}
-
-// Starts a background session named `name` in `path`, with `prompt` (none:
-// it waits for one); answers why not when it could not.
-async function start($: EngineInterface, path: string, name: string, prompt: string[]): Promise<string | undefined> {
-  const ran = await $.process.run(['claude', '--bg', '--name', name, ...prompt], { cwd: path })
+// Starts a background session named `name` in `path`, waiting for a prompt;
+// answers why not when it could not.
+async function start($: EngineInterface, path: string, name: string): Promise<string | undefined> {
+  const ran = await $.process.run(['claude', '--bg', '--name', name], { cwd: path })
   await refresh($)
   return ran.exitCode === 0 ? undefined : `Could not start a session in ${path}: ${ran.stderr.trim()}`
 }
@@ -220,7 +174,7 @@ export async function prepare($: EngineInterface, args: PrepareArgs): Promise<st
   const named = await newSessionName($, rows, args.label)
   if (typeof named === 'string') return named
   const { name } = named
-  const failed = await start($, repo.path, name, [])
+  const failed = await start($, repo.path, name)
   if (failed) return failed
   const started = findSession(await read($, sessions), name)
   if (!started) return `Started ${name} in ${repo.path}, but it is not listed yet: prepare session "${name}".`
@@ -273,7 +227,7 @@ async function switchTo($: EngineInterface, path: string, attachArgs: string[]):
   return `Opened ${done.session} in tmux.`
 }
 
-// A row's short id is what `claude stop`, `rm` and `logs` are documented to take.
+// A row's short id is what `claude stop` and `rm` are documented to take.
 const jobId = (row: AgentRow) => row.id ?? row.sessionId
 
 function noSession(rows: AgentRow[], name: string): string {
@@ -295,21 +249,8 @@ export async function stopOrRemove($: EngineInterface, verb: 'stop' | 'rm', name
   return said || `${verb === 'stop' ? 'Stopped' : 'Removed'} ${worker.name}.`
 }
 
-const LOG_LINES = 200
-
-export async function logsOf($: EngineInterface, name: string): Promise<string> {
-  const rows = await listRows($)
-  const worker = findSession(rows, name)
-  if (!worker) return noSession(rows, name)
-  const ran = await $.process.run(['claude', 'logs', jobId(worker)])
-  if (ran.exitCode !== 0) return `claude logs ${worker.name} failed: ${ran.stderr.trim()}`
-  const lines = ran.stdout.trimEnd().split('\n')
-  const cut = lines.length > LOG_LINES ? `(last ${LOG_LINES} of ${lines.length} lines)\n` : ''
-  return cut + lines.slice(-LOG_LINES).join('\n')
-}
-
-// The pane is the hub: the list is polled only while it is open, whether or
-// not anyone looks at it, and closing it stops the poll.
+// The list is polled only while the pane is open, whether or not anyone looks
+// at it, and closing it stops the poll.
 let poll: { cancel: () => void } | undefined
 
 async function openPane($: EngineInterface): Promise<void> {
@@ -332,8 +273,7 @@ function short(path: string): string {
   return path.replace(/^\/home\/[^/]+\/develop\//, '')
 }
 
-// Only what a person does by hand; the rest is asked of the hub in words,
-// which reaches the tools.
+// Only what a person does by hand; the rest the model does with the tools.
 const COMMANDS: CommandSpec[] = [
   { name: 'session-hub', description: 'Open or close the hub sessions pane' },
   {
@@ -344,38 +284,6 @@ const COMMANDS: CommandSpec[] = [
 ]
 
 const TOOLS: ToolSpec[] = [
-  {
-    name: 'session-dispatch',
-    description:
-      'Hand a task to a background Claude Code session of a repository under ~/develop. ' +
-      'Without `session`, starts a new session in `repo` with `claude --bg` (a repository can ' +
-      'have several). With `session`, sends the task to that existing session, resuming it ' +
-      'when stopped. The task is sent with a request to reply to this hub by SendMessage. ' +
-      'session-prepare then puts the session in a tmux window. session-list lists the sessions ' +
-      'and their names.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        task: { type: 'string', description: 'What the session should do' },
-        repo: {
-          type: 'string',
-          description: 'Repository name or absolute path to start a new session in',
-        },
-        session: {
-          type: 'string',
-          description: 'Name of an existing session to send to; omit to start a new one',
-        },
-        label: {
-          type: 'string',
-          description:
-            "A new session's name: one or two words for what it does, taken from the task (review, aws-s3). " +
-            'The repository is not part of it; -2, -3 ... is added when the name is taken.',
-        },
-      },
-      required: ['task'],
-    },
-    isDeferred: true,
-  },
   {
     name: 'session-prepare',
     description:
@@ -396,7 +304,7 @@ const TOOLS: ToolSpec[] = [
           type: 'string',
           description:
             "A new session's name when `session` is omitted: one or two words for what it is for " +
-            '(review, aws-s3), without the repository.',
+            '(review, aws-s3), without the repository; -2, -3 ... is added when the name is taken.',
         },
       },
     },
@@ -405,23 +313,11 @@ const TOOLS: ToolSpec[] = [
   {
     name: 'session-stop',
     description:
-      'Stop a background session (`claude stop`). Its conversation is kept; session-dispatch to it ' +
-      'resumes it.',
+      'Stop a background session (`claude stop`). Its conversation is kept; attaching to it ' +
+      '(session-prepare) resumes it.',
     inputSchema: {
       type: 'object',
       properties: { session: { type: 'string', description: 'Name of the session to stop' } },
-      required: ['session'],
-    },
-    isDeferred: true,
-  },
-  {
-    name: 'session-logs',
-    description:
-      "Read a background session's recent terminal output (`claude logs`), to see what it did " +
-      'without attaching to it.',
-    inputSchema: {
-      type: 'object',
-      properties: { session: { type: 'string', description: 'Name of the session to read' } },
       required: ['session'],
     },
     isDeferred: true,
@@ -468,17 +364,6 @@ export const register: Register = on => {
     return next(e)
   })
 
-  on('tool.call', { tool: 'mcp__session-hub__session-dispatch' }, async ($, e: any) => {
-    const text = (v: unknown) => (typeof v === 'string' && v.trim() !== '' ? v : undefined)
-    const args = {
-      task: String(e.task ?? ''),
-      repo: text(e.repo),
-      session: text(e.session),
-      label: text(e.label),
-    }
-    return { result: await dispatch($, args) }
-  }).catch(($, e, next) => ({ deny: `session-hub: session-dispatch failed: ${String(next.error)}` }))
-
   on('tool.call', { tool: 'mcp__session-hub__session-prepare' }, async ($, e: any) => {
     const text = (v: unknown) => (typeof v === 'string' && v.trim() !== '' ? v : undefined)
     const args = { session: text(e.session), repo: text(e.repo), label: text(e.label) }
@@ -495,10 +380,6 @@ export const register: Register = on => {
   on('tool.call', { tool: 'mcp__session-hub__session-stop' }, async ($, e: any) => ({
     result: await stopOrRemove($, 'stop', String(e.session ?? '')),
   })).catch(($, e, next) => ({ deny: `session-hub: session-stop failed: ${String(next.error)}` }))
-
-  on('tool.call', { tool: 'mcp__session-hub__session-logs' }, async ($, e: any) => ({
-    result: await logsOf($, String(e.session ?? '')),
-  })).catch(($, e, next) => ({ deny: `session-hub: session-logs failed: ${String(next.error)}` }))
 
   on('command.run', { command: 'session-hub' }, async $ => {
     if ((await $.ui.panes()).some(p => p.id === PANE)) {
