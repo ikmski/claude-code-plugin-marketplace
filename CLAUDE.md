@@ -113,12 +113,12 @@ chrome-devtools-mcp（MCP サーバ）で Chrome を操作できるようにす�
 - `scripts/chrome-debug.sh` - CDP ポート付きで Chrome を起動するランチャー（冪等）。Chrome 136+ が通常プロファイルでのリモートデバッグを拒否するため、専用プロファイル `chrome-debug-profile` を使う
 - `/chrome-devtools:browse` - ブラウザ操作の入口スキル。CDP エンドポイント確保 → `new_page` から始める（`navigate_page` 直呼びは「No page selected」になる）等の手順とガードレールを定義する。「ブラウザで開いて」「スクリーンショット」等の自然言語でも発火する
 
-### session-hub Plugin
-Location: `plugins/session-hub/`
+### tmux-agents Plugin
+Location: `plugins/tmux-agents/`
 
-セッションからリポジトリごとのバックグラウンドセッション（`claude --bg`）へタスクを依頼し、一覧をペインで見てセッション間を移る mod（`hooks/hooks.json` が TypeScript の hooks モジュールを読む形式）。user scope で入れ、`/session-hub` でペインを開いたセッションが hub になる（ペインが開いている間だけポーリングする）。依存する `tmux-project` / `tmux-claude-attach` は ikmski/nix-config が配る。
+agent view（`claude agents`）のバックグラウンドセッション（`claude --bg`）を、リポジトリごとの tmux session / window で扱う mod（`hooks/hooks.json` が TypeScript の hooks モジュールを読む形式）。ペインで一覧を見て行から window へ移り、モデルは一覧・window の用意・停止ができる。セッション間のやり取り（依頼・返信）は持たない。user scope で入れ、`/tmux-agents` でペインを開いたセッションが、開いている間だけポーリングする。依存する `tmux-project` / `tmux-claude-attach` は ikmski/nix-config が配る（新しいセッションの名前の規則も tmux-claude-attach が持つ）。
 
-- このプラグインだけはテストを持つ。変更後は `claude plugin validate plugins/session-hub` と `claude plugin test plugins/session-hub` を通す
+- このプラグインだけはテストを持つ。変更後は `claude plugin validate plugins/tmux-agents` と `claude plugin test plugins/tmux-agents` を通す
 
 ## Adding New Plugins
 

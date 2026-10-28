@@ -3,17 +3,17 @@ import type { CommandSpec, EngineInterface, Register, ToolSpec } from 'claude-co
 
 import type { AgentRow } from '../types'
 
-const PANE = 'hub-sessions'
+const PANE = 'tmux-agents'
 // Fits <org>/<repo> and " ● <label>  <state> <age>" (a session is named by
 // its label alone) without taking the dock's default share from the transcript.
 const PANE_COLUMNS = 32
 // Every poll starts a `claude agents` process, so keep it slow.
 const POLL_MS = 15_000
 
-const sessions = atom({ plugin: 'session-hub', key: 'sessions' } as const, [], {
+const sessions = atom({ plugin: 'tmux-agents', key: 'sessions' } as const, [], {
   shape: 'sessions-1',
 })
-const error = atom({ plugin: 'session-hub', key: 'error' } as const, '', {
+const error = atom({ plugin: 'tmux-agents', key: 'error' } as const, '', {
   shape: 'error-1',
 })
 
@@ -41,27 +41,6 @@ export function resolveRepo(repos: Repo[], query: string): Repo | string {
   if (only && partial.length === 1) return only
   if (partial.length === 0) return `No repository matches "${q}".`
   return `"${q}" matches several repositories: ${partial.map(r => r.path).join(', ')}`
-}
-
-// tmux takes `.` and `:` in a target as separators.
-const sanitize = (s: string) => s.trim().replace(/\s+/g, '-').replace(/[.:]/g, '_')
-
-// The label alone: the pane shows a session under its repository, and the
-// name is also its tmux window's. A session is addressed by its name alone
-// (session-dispatch, SendMessage), so a name any session has gets -2, -3 ...;
-// with no label, 1, 2 ...
-export function newSessionName(rows: AgentRow[], label = ''): string {
-  const stem = sanitize(label)
-  const taken = new Set(rows.map(r => r.name))
-  if (stem === '') {
-    let n = 1
-    while (taken.has(String(n))) n++
-    return String(n)
-  }
-  if (!taken.has(stem)) return stem
-  let n = 2
-  while (taken.has(`${stem}-${n}`)) n++
-  return `${stem}-${n}`
 }
 
 // A session in a worktree Claude Code made (`<repo>/.claude/worktrees/<name>`)
@@ -128,73 +107,50 @@ async function refresh($: EngineInterface): Promise<void> {
   }
   await update($, sessions, () => rows)
   await update($, error, () => '')
+  try {
+    await syncWindows($, rows)
+  } catch {
+    // Without tmux there is no window to keep up to date.
+  }
+}
+
+// tmux-claude-attach marks a session's window with the window options
+// @claude_job (its job id, which resuming keeps) and @claude_session (its
+// sessionId, which resuming changes and claude-tmux-status looks a window up
+// by), and names it after the session. A window is matched by its job id, and
+// a sessionId or a name changed since is carried over here. A window made
+// before @claude_job is matched by its sessionId until tmux-claude-attach
+// attaches it again and marks it.
+async function syncWindows($: EngineInterface, rows: AgentRow[]): Promise<void> {
+  const ran = await $.process.run([
+    'tmux',
+    'list-windows',
+    '-a',
+    '-F',
+    '#{window_id}\t#{@claude_job}\t#{@claude_session}\t#{window_name}',
+  ])
+  if (ran.exitCode !== 0) return
+  for (const [wid, job, sid, name] of ran.stdout.split('\n').map(line => line.split('\t'))) {
+    const row = job ? rows.find(r => r.id === job) : rows.find(r => r.sessionId === sid)
+    if (!wid || !row) continue
+    if (row.sessionId !== sid) await $.process.run(['tmux', 'set-option', '-w', '-t', wid, '@claude_session', row.sessionId])
+    if (row.name !== name) await $.process.run(['tmux', 'rename-window', '-t', wid, row.name])
+  }
 }
 
 function label(row: AgentRow): string {
   return row.state ?? row.status
 }
 
-// The reply address is this session's name as it is listed now. A session
-// started from argv has no sender to reply to, so the task has to name one.
-async function hubName($: EngineInterface, rows: AgentRow[]): Promise<string | undefined> {
-  const me = await $.session.id()
-  return rows.find(r => r.sessionId === me)?.name
-}
-
-export type DispatchArgs = { task: string; repo?: string; session?: string; label?: string }
-
-// Without `session` a new session is started in `repo`; with it the task goes
-// to that session (resumed when stopped).
-export async function dispatch($: EngineInterface, args: DispatchArgs): Promise<string> {
-  const rows = await listRows($)
-  const hub = await hubName($, rows)
-  const text = hub
-    ? `${args.task}\n\n終わったら SendMessage で ${hub} へ結果を返してください。`
-    : args.task
-  const warn = hub ? '' : '\n(このセッションの名前が取れないため、依頼文に返信先を付けていません)'
-
-  if (args.session) {
-    const worker = findSession(rows, args.session)
-    if (!worker) return noSession(rows, args.session)
-    if (isStopped(worker)) {
-      const ran = await $.process.run(['claude', '--resume', worker.sessionId, '--bg', text], {
-        cwd: worker.cwd,
-      })
-      await refresh($)
-      if (ran.exitCode !== 0) return `Could not resume ${worker.name}: ${ran.stderr.trim()}`
-      return `Resumed ${worker.name} (${worker.cwd}).${warn}`
-    }
-    const sent = await $.session.send({ to: { sessionId: worker.sessionId }, text })
-    if (!sent.isDelivered) return `Not delivered to ${worker.name}: ${sent.reason}`
-    await refresh($)
-    return `Sent to ${worker.name} (${worker.cwd}).${warn}`
-  }
-
-  if (!args.repo) return 'Name a repository to start a session in, or a session to send to.'
-  const repo = resolveRepo(await listRepos($), args.repo)
-  if (typeof repo === 'string') return repo
-  const name = newSessionName(rows, args.label)
-  const failed = await start($, repo.path, name, [text])
-  if (failed) return failed
-  return `Started ${name} in ${repo.path}. Follow up with session "${name}".${warn}`
-}
-
-// Starts a background session named `name` in `path`, with `prompt` (none:
-// it waits for one); answers why not when it could not.
-async function start($: EngineInterface, path: string, name: string, prompt: string[]): Promise<string | undefined> {
-  const ran = await $.process.run(['claude', '--bg', '--name', name, ...prompt], { cwd: path })
-  await refresh($)
-  return ran.exitCode === 0 ? undefined : `Could not start a session in ${path}: ${ran.stderr.trim()}`
-}
-
 export type PrepareArgs = { session?: string; repo?: string; label?: string }
 
 // For the model: the user's screen stays where it is. A session is found by
-// its name, which newSessionName keeps unique; without one, a new session is
-// started in `repo` under this mod's naming (not tmux-claude-attach's -n).
+// its name; without one, tmux-claude-attach -n starts a new session in `repo`
+// and attaches to it, as its "new session" does, so the naming rule is its
+// alone and a session is named alike from either.
 export async function prepare($: EngineInterface, args: PrepareArgs): Promise<string> {
-  const rows = await listRows($)
   if (args.session) {
+    const rows = await listRows($)
     const worker = findSession(rows, args.session)
     if (!worker) return noSession(rows, args.session)
     return prepareWindow($, worker.cwd, ['-i', worker.sessionId])
@@ -202,12 +158,7 @@ export async function prepare($: EngineInterface, args: PrepareArgs): Promise<st
   if (!args.repo) return 'Name a session to put in tmux, or a repository to start one in.'
   const repo = resolveRepo(await listRepos($), args.repo)
   if (typeof repo === 'string') return repo
-  const name = newSessionName(rows, args.label)
-  const failed = await start($, repo.path, name, [])
-  if (failed) return failed
-  const started = findSession(await read($, sessions), name)
-  if (!started) return `Started ${name} in ${repo.path}, but it is not listed yet: prepare session "${name}".`
-  return prepareWindow($, repo.path, ['-i', started.sessionId])
+  return prepareWindow($, repo.path, ['-n', args.label ?? ''])
 }
 
 // Sets up the tmux session of `path` without switching to it (a background
@@ -235,7 +186,7 @@ async function prepareWindow($: EngineInterface, path: string, attachArgs: strin
   return `${done.session} の window ${done.printed} に出した。入るには prefix S 等で切り替える。`
 }
 
-// For /session-switch: a session by its name, else a repository, where
+// For /tmux-agents-switch: a session by its name, else a repository, where
 // tmux-claude-attach picks (one session: it; several: a picker).
 async function switchToQuery($: EngineInterface, query: string): Promise<string> {
   const worker = findSession(await listRows($), query)
@@ -256,7 +207,7 @@ async function switchTo($: EngineInterface, path: string, attachArgs: string[]):
   return `Opened ${done.session} in tmux.`
 }
 
-// A row's short id is what `claude stop`, `rm` and `logs` are documented to take.
+// A row's short id is what `claude stop` and `rm` are documented to take.
 const jobId = (row: AgentRow) => row.id ?? row.sessionId
 
 function noSession(rows: AgentRow[], name: string): string {
@@ -278,26 +229,13 @@ export async function stopOrRemove($: EngineInterface, verb: 'stop' | 'rm', name
   return said || `${verb === 'stop' ? 'Stopped' : 'Removed'} ${worker.name}.`
 }
 
-const LOG_LINES = 200
-
-export async function logsOf($: EngineInterface, name: string): Promise<string> {
-  const rows = await listRows($)
-  const worker = findSession(rows, name)
-  if (!worker) return noSession(rows, name)
-  const ran = await $.process.run(['claude', 'logs', jobId(worker)])
-  if (ran.exitCode !== 0) return `claude logs ${worker.name} failed: ${ran.stderr.trim()}`
-  const lines = ran.stdout.trimEnd().split('\n')
-  const cut = lines.length > LOG_LINES ? `(last ${LOG_LINES} of ${lines.length} lines)\n` : ''
-  return cut + lines.slice(-LOG_LINES).join('\n')
-}
-
-// The pane is the hub: the list is polled only while it is open, whether or
-// not anyone looks at it, and closing it stops the poll.
+// The list is polled only while the pane is open, whether or not anyone looks
+// at it, and closing it stops the poll.
 let poll: { cancel: () => void } | undefined
 
 async function openPane($: EngineInterface): Promise<void> {
   await refresh($)
-  await $.ui.open({ id: PANE, title: 'Hub sessions', columns: PANE_COLUMNS })
+  await $.ui.open({ id: PANE, title: 'Agents', columns: PANE_COLUMNS })
   poll ??= $.clock.every(POLL_MS, () => refresh($))
 }
 
@@ -315,50 +253,17 @@ function short(path: string): string {
   return path.replace(/^\/home\/[^/]+\/develop\//, '')
 }
 
-// Only what a person does by hand; the rest is asked of the hub in words,
-// which reaches the tools.
+// Only what a person does by hand; the rest the model does with the tools.
 const COMMANDS: CommandSpec[] = [
-  { name: 'session-hub', description: 'Open or close the hub sessions pane' },
+  { name: 'tmux-agents', description: 'Open or close the agents pane' },
   {
-    name: 'session-switch',
-    description: "Switch the screen to a session's tmux window, or to a repository's: /session-switch <session|repo>",
+    name: 'tmux-agents-switch',
+    description: "Switch the screen to a session's tmux window, or to a repository's: /tmux-agents-switch <session|repo>",
   },
-  { name: 'session-rm', description: 'Delete a background session and its worktree: /session-rm <session>' },
+  { name: 'tmux-agents-rm', description: 'Delete a background session and its worktree: /tmux-agents-rm <session>' },
 ]
 
 const TOOLS: ToolSpec[] = [
-  {
-    name: 'session-dispatch',
-    description:
-      'Hand a task to a background Claude Code session of a repository under ~/develop. ' +
-      'Without `session`, starts a new session in `repo` with `claude --bg` (a repository can ' +
-      'have several). With `session`, sends the task to that existing session, resuming it ' +
-      'when stopped. The task is sent with a request to reply to this hub by SendMessage. ' +
-      'session-prepare then puts the session in a tmux window. session-list lists the sessions ' +
-      'and their names.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        task: { type: 'string', description: 'What the session should do' },
-        repo: {
-          type: 'string',
-          description: 'Repository name or absolute path to start a new session in',
-        },
-        session: {
-          type: 'string',
-          description: 'Name of an existing session to send to; omit to start a new one',
-        },
-        label: {
-          type: 'string',
-          description:
-            "A new session's name: one or two words for what it does, taken from the task (review, aws-s3). " +
-            'The repository is not part of it; -2, -3 ... is added when the name is taken.',
-        },
-      },
-      required: ['task'],
-    },
-    isDeferred: true,
-  },
   {
     name: 'session-prepare',
     description:
@@ -379,7 +284,7 @@ const TOOLS: ToolSpec[] = [
           type: 'string',
           description:
             "A new session's name when `session` is omitted: one or two words for what it is for " +
-            '(review, aws-s3), without the repository.',
+            '(review, aws-s3), without the repository; -2, -3 ... is added when the name is taken.',
         },
       },
     },
@@ -388,23 +293,11 @@ const TOOLS: ToolSpec[] = [
   {
     name: 'session-stop',
     description:
-      'Stop a background session (`claude stop`). Its conversation is kept; session-dispatch to it ' +
-      'resumes it.',
+      'Stop a background session (`claude stop`). Its conversation is kept; attaching to it ' +
+      '(session-prepare) resumes it.',
     inputSchema: {
       type: 'object',
       properties: { session: { type: 'string', description: 'Name of the session to stop' } },
-      required: ['session'],
-    },
-    isDeferred: true,
-  },
-  {
-    name: 'session-logs',
-    description:
-      "Read a background session's recent terminal output (`claude logs`), to see what it did " +
-      'without attaching to it.',
-    inputSchema: {
-      type: 'object',
-      properties: { session: { type: 'string', description: 'Name of the session to read' } },
       required: ['session'],
     },
     isDeferred: true,
@@ -423,14 +316,14 @@ async function declare($: EngineInterface): Promise<void> {
     try {
       await $.command.register(command)
     } catch (err) {
-      $.ui.log(`session-hub: /${command.name} is not available: ${String(err)}`)
+      $.ui.log(`tmux-agents: /${command.name} is not available: ${String(err)}`)
     }
   }
   for (const tool of TOOLS) {
     try {
       await $.tool.register(tool)
     } catch (err) {
-      $.ui.log(`session-hub: ${tool.name} is not available: ${String(err)}`)
+      $.ui.log(`tmux-agents: ${tool.name} is not available: ${String(err)}`)
     }
   }
 }
@@ -451,57 +344,42 @@ export const register: Register = on => {
     return next(e)
   })
 
-  on('tool.call', { tool: 'mcp__session-hub__session-dispatch' }, async ($, e: any) => {
-    const text = (v: unknown) => (typeof v === 'string' && v.trim() !== '' ? v : undefined)
-    const args = {
-      task: String(e.task ?? ''),
-      repo: text(e.repo),
-      session: text(e.session),
-      label: text(e.label),
-    }
-    return { result: await dispatch($, args) }
-  }).catch(($, e, next) => ({ deny: `session-hub: session-dispatch failed: ${String(next.error)}` }))
-
-  on('tool.call', { tool: 'mcp__session-hub__session-prepare' }, async ($, e: any) => {
+  on('tool.call', { tool: 'mcp__tmux-agents__session-prepare' }, async ($, e: any) => {
     const text = (v: unknown) => (typeof v === 'string' && v.trim() !== '' ? v : undefined)
     const args = { session: text(e.session), repo: text(e.repo), label: text(e.label) }
     return { result: await prepare($, args) }
-  }).catch(($, e, next) => ({ deny: `session-hub: session-prepare failed: ${String(next.error)}` }))
+  }).catch(($, e, next) => ({ deny: `tmux-agents: session-prepare failed: ${String(next.error)}` }))
 
-  on('tool.call', { tool: 'mcp__session-hub__session-list' }, async $ => {
+  on('tool.call', { tool: 'mcp__tmux-agents__session-list' }, async $ => {
     const rows = await listRows($)
     await update($, sessions, () => rows)
     // An array result is read as content blocks, so hand the rows over as text.
     return { result: JSON.stringify(rows.map(r => ({ ...r, repo: short(repoRoot(r.cwd)) })), null, 2) }
-  }).catch(($, e, next) => ({ deny: `session-hub: session-list failed: ${String(next.error)}` }))
+  }).catch(($, e, next) => ({ deny: `tmux-agents: session-list failed: ${String(next.error)}` }))
 
-  on('tool.call', { tool: 'mcp__session-hub__session-stop' }, async ($, e: any) => ({
+  on('tool.call', { tool: 'mcp__tmux-agents__session-stop' }, async ($, e: any) => ({
     result: await stopOrRemove($, 'stop', String(e.session ?? '')),
-  })).catch(($, e, next) => ({ deny: `session-hub: session-stop failed: ${String(next.error)}` }))
+  })).catch(($, e, next) => ({ deny: `tmux-agents: session-stop failed: ${String(next.error)}` }))
 
-  on('tool.call', { tool: 'mcp__session-hub__session-logs' }, async ($, e: any) => ({
-    result: await logsOf($, String(e.session ?? '')),
-  })).catch(($, e, next) => ({ deny: `session-hub: session-logs failed: ${String(next.error)}` }))
-
-  on('command.run', { command: 'session-hub' }, async $ => {
+  on('command.run', { command: 'tmux-agents' }, async $ => {
     if ((await $.ui.panes()).some(p => p.id === PANE)) {
       await $.ui.close({ id: PANE })
       stopPolling()
-      return { text: 'Hub sessions pane closed.' }
+      return { text: 'Agents pane closed.' }
     }
     await openPane($)
-    return { text: 'Hub sessions pane opened.' }
+    return { text: 'Agents pane opened.' }
   })
 
-  on('command.run', { command: 'session-switch' }, async ($, e) => {
+  on('command.run', { command: 'tmux-agents-switch' }, async ($, e) => {
     const query = e.args.trim()
-    if (!query) return { text: 'Usage: /session-switch <session|repo>' }
+    if (!query) return { text: 'Usage: /tmux-agents-switch <session|repo>' }
     return { text: await switchToQuery($, query) }
   })
 
-  on('command.run', { command: 'session-rm' }, async ($, e) => {
+  on('command.run', { command: 'tmux-agents-rm' }, async ($, e) => {
     const name = e.args.trim()
-    if (!name) return { text: 'Usage: /session-rm <session>' }
+    if (!name) return { text: 'Usage: /tmux-agents-rm <session>' }
     return { text: await stopOrRemove($, 'rm', name) }
   })
 

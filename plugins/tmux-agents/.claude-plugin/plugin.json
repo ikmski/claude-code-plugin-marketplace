@@ -1,0 +1,11 @@
+{
+    "name": "tmux-agents",
+    "version": "0.10.0",
+    "description": "agent view（claude agents）のバックグラウンドセッションを、リポジトリごとの tmux session / window で一覧・行き来する mod",
+    "author": {
+        "name": "Masaki IKEDA",
+        "email": "ikeda.masaki@gmail.com"
+    },
+    "keywords": ["mod", "background-session", "agent-view", "tmux"],
+    "types": "./types/index.d.ts"
+}
