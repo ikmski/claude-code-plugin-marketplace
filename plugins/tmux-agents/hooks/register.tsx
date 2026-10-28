@@ -43,24 +43,6 @@ export function resolveRepo(repos: Repo[], query: string): Repo | string {
   return `"${q}" matches several repositories: ${partial.map(r => r.path).join(', ')}`
 }
 
-// claude-session-name (nix-config) owns the naming rule, so a session started
-// here and one started from tmux-claude-attach are named alike; it is handed
-// the rows already read, not to list them twice. Without it no session is
-// started under another name: the rule would be in two places, and a name it
-// did not give could be one another session has, while a session is found by
-// its name alone. Answers why not when it could not.
-async function newSessionName($: EngineInterface, rows: AgentRow[], label = ''): Promise<{ name: string } | string> {
-  let ran
-  try {
-    ran = await $.process.run(['claude-session-name', label], { stdin: JSON.stringify(rows) })
-  } catch (err) {
-    return `claude-session-name を実行できないので、新しいセッションは起動しません（nix-config が ~/.local/bin に置きます）: ${String(err)}`
-  }
-  const name = ran.stdout.trim()
-  if (ran.exitCode === 0 && name) return { name }
-  return `Could not name a new session: ${ran.stderr.trim() || 'claude-session-name printed nothing'}`
-}
-
 // A session in a worktree Claude Code made (`<repo>/.claude/worktrees/<name>`)
 // is shown under its repository.
 export function repoRoot(cwd: string): string {
@@ -148,22 +130,15 @@ function label(row: AgentRow): string {
   return row.state ?? row.status
 }
 
-// Starts a background session named `name` in `path`, waiting for a prompt;
-// answers why not when it could not.
-async function start($: EngineInterface, path: string, name: string): Promise<string | undefined> {
-  const ran = await $.process.run(['claude', '--bg', '--name', name], { cwd: path })
-  await refresh($)
-  return ran.exitCode === 0 ? undefined : `Could not start a session in ${path}: ${ran.stderr.trim()}`
-}
-
 export type PrepareArgs = { session?: string; repo?: string; label?: string }
 
 // For the model: the user's screen stays where it is. A session is found by
-// its name, which newSessionName keeps unique; without one, a new session is
-// started here in `repo` under the name claude-session-name gives.
+// its name; without one, tmux-claude-attach -n starts a new session in `repo`
+// and attaches to it, as its "new session" does, so the naming rule is its
+// alone and a session is named alike from either.
 export async function prepare($: EngineInterface, args: PrepareArgs): Promise<string> {
-  const rows = await listRows($)
   if (args.session) {
+    const rows = await listRows($)
     const worker = findSession(rows, args.session)
     if (!worker) return noSession(rows, args.session)
     return prepareWindow($, worker.cwd, ['-i', worker.sessionId])
@@ -171,14 +146,7 @@ export async function prepare($: EngineInterface, args: PrepareArgs): Promise<st
   if (!args.repo) return 'Name a session to put in tmux, or a repository to start one in.'
   const repo = resolveRepo(await listRepos($), args.repo)
   if (typeof repo === 'string') return repo
-  const named = await newSessionName($, rows, args.label)
-  if (typeof named === 'string') return named
-  const { name } = named
-  const failed = await start($, repo.path, name)
-  if (failed) return failed
-  const started = findSession(await read($, sessions), name)
-  if (!started) return `Started ${name} in ${repo.path}, but it is not listed yet: prepare session "${name}".`
-  return prepareWindow($, repo.path, ['-i', started.sessionId])
+  return prepareWindow($, repo.path, ['-n', args.label ?? ''])
 }
 
 // Sets up the tmux session of `path` without switching to it (a background

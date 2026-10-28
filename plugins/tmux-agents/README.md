@@ -17,15 +17,14 @@ session-hub から入れ替えるときは、`session-hub` をアンインスト
 
 ## 前提
 
-- `claude-session-name`・`tmux-project`・`tmux-claude-attach` が PATH にあること。どれも ikmski/nix-config が
+- `tmux-project` と `tmux-claude-attach` が PATH にあること。どちらも ikmski/nix-config が
   `~/.local/bin` に置く。この mod が使うのは次の形:
-  - `claude-session-name [LABEL]`: 新しいセッションの名前を出す。名前の規則はここが持ち、使われている名前は
-    `claude agents --json --all` の一覧を stdin で渡す。無ければ新しいセッションは起動しない（代わりの名前でも
-    起動しない）。既にあるセッションの window の用意・切り替え・停止は動く
   - `tmux-project -l`: リポジトリの候補
   - `tmux-project -d <path>`: tmux session を用意するだけで client を切り替えず、session 名を出す
   - `tmux-claude-attach -d -t <session> -i <sessionId>`: window を作るだけで
     切り替えず、window 名を出す
+  - `tmux-claude-attach -d -t <session> -n <LABEL>`: 新しいセッションを名前を付けて起動し、その window を
+    作るだけで切り替えず、window 名を出す。名前の規則は tmux-claude-attach が持つ
   - `tmux-claude-attach -t <session> [-i <sessionId>] -c <client>`: ユーザーの client を
     その window へ切り替える。この mod を動かすセッションは tmux の外にいることもあるため、client は明示する
 
@@ -35,15 +34,16 @@ session-hub から入れ替えるときは、`session-hub` をアンインスト
 人が打つコマンドは、ペインの開閉・画面の切り替え・削除の 3 つだけ。名前は 1 つずつ登録し、
 Claude Code に断られたものだけが欠けて、その旨を transcript に出す。
 
-- 1 リポジトリに複数のセッションを持てる。新しいセッションの名前は用途（`review`、`aws-s3` など。モデルが付ける）から
-  `claude-session-name` が付ける。`prefix A` の「新しいセッション」も同じものを使うので、同じ名前の付き方になる。
-  リポジトリ名は含めず、リポジトリはペインの見出しに出る。
+- 1 リポジトリに複数のセッションを持てる。新しいセッションは `tmux-claude-attach -n` が用途（`review`、`aws-s3`
+  など。モデルが付ける）から名前を付けて起動するので、`prefix A` の「新しいセッション」と同じ名前の付き方になる。
+  名前は用途だけでリポジトリ名は含めず、同じ名前があれば `-2`, `-3` …、用途が無ければ `1`, `2` …。
+  リポジトリはペインの見出しに出る。
 - 名前は tmux の window 名にもなる。あとで名前が変わっても、attach したときとペインが一覧を読み直すたびに
   window 名が追従する。
 - `session-prepare`（ツール）: Claude session の window を、そのリポジトリの tmux session に
   ユーザーの画面を切り替えずに用意し、どの session の何という window かを返す。セッション名を
   指定すればそのバックグラウンドセッションに attach し、省略すればリポジトリで新しいセッションを
-  上の規則で起動してから attach する。
+  起動してから attach する（どちらも tmux-claude-attach が行う）。
 - `/tmux-agents-switch <session|repo>`（コマンド）: 同じように用意したうえで、人の画面をそこへ切り替える。
   セッション名でなければリポジトリとして扱い、`tmux-claude-attach` が選ぶ（複数あれば選択の popup）。
 - バックグラウンドセッションの状態を出すドックペイン「Agents」。`/tmux-agents` で開閉を切り替える（ペインの

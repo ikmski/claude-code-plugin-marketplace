@@ -58,33 +58,24 @@ const AGENTS: AgentRow[] = [
 ]
 
 // `windows` is what `tmux list-windows -a` prints: "<window_id>\t<@claude_session>\t<name>".
-function engine(
-  on: any,
-  agents: AgentRow[],
-  runs: string[][],
-  onRun?: (argv: string[], init?: { stdin?: string }) => void,
-  windows = '',
-) {
+function engine(on: any, agents: AgentRow[], runs: string[][], windows = '') {
   on('process.run', (_: unknown, e: any) => {
     runs.push([...e.argv])
-    onRun?.(e.argv, e.init)
     const [cmd, sub] = e.argv
     const stdout =
       cmd === 'tmux-project' && sub === '-l'
         ? REPOS.map(r => `  ${r.name}\t${r.path}`).join('\n')
         : cmd === 'tmux-project' && sub === '-d'
           ? 'ccwatch\n'
-          : cmd === 'claude-session-name'
-            ? `${sub || '1'}\n`
-            : cmd === 'tmux-claude-attach'
-              ? 'claude-w\n'
-              : cmd === 'tmux' && sub === 'display-message'
-                ? '/dev/pts/1\n'
-                : cmd === 'tmux' && sub === 'list-windows'
-                  ? windows
-                  : cmd === 'claude' && sub === 'agents'
-                    ? JSON.stringify(agents)
-                    : ''
+          : cmd === 'tmux-claude-attach'
+            ? 'claude-w\n'
+            : cmd === 'tmux' && sub === 'display-message'
+              ? '/dev/pts/1\n'
+              : cmd === 'tmux' && sub === 'list-windows'
+                ? windows
+                : cmd === 'claude' && sub === 'agents'
+                  ? JSON.stringify(agents)
+                  : ''
     return { value: { exitCode: 0, stdout, stderr: '' } }
   })
 }
@@ -105,75 +96,45 @@ test('session-prepare puts a session, found by its name, in a window without swi
   expect(ran.result).toMatch(/^ccwatch の window claude-w に出した/)
 })
 
-test('session-prepare without a session starts one named by its label, then puts it in a window', async ($, on) => {
+test('session-prepare without a session has tmux-claude-attach start one under its label', async ($, on) => {
   const runs: string[][] = []
-  const agents = [...AGENTS]
-  const stdins: (string | undefined)[] = []
-  // `claude --bg` lists the new session from then on.
-  engine(on, agents, runs, (argv, init) => {
-    if (argv[0] === 'claude-session-name') stdins.push(init?.stdin)
-    if (argv[1] === '--bg') agents.push(row({ sessionId: 'new-id', name: argv[3], cwd: '/home/u/develop/ikmski/ccwatch' }))
-  })
+  engine(on, AGENTS, runs)
 
   const ran: any = await $.tool.call({ tool: PREPARE, repo: 'ccwatch', label: 'review' } as any)
+  const bare: any = await $.tool.call({ tool: PREPARE, repo: 'ccwatch' } as any)
 
-  expect(runs.find(a => a[1] === '--bg')).toEqual(['claude', '--bg', '--name', 'review'])
-  // The name is the one claude-session-name gives for the label, handed the
-  // rows already read rather than listing them again.
-  expect(runs.filter(a => a[0] === 'claude-session-name')).toEqual([['claude-session-name', 'review']])
-  expect(stdins).toEqual([JSON.stringify(AGENTS)])
-  expect(runs.slice(0, runs.findIndex(a => a[1] === '--bg')).filter(a => a[1] === 'agents').length).toBe(1)
-  expect(runs.filter(a => a[0] === 'tmux-claude-attach')).toEqual([
-    ['tmux-claude-attach', '-t', 'ccwatch', '-d', '-i', 'new-id'],
+  // tmux-claude-attach names, starts and attaches, as its "new session" does;
+  // the mod neither names nor starts one itself.
+  expect(detached(runs)).toEqual([
+    ['tmux-project', '-d', '/home/u/develop/ikmski/ccwatch'],
+    ['tmux-claude-attach', '-t', 'ccwatch', '-d', '-n', 'review'],
+    ['tmux-project', '-d', '/home/u/develop/ikmski/ccwatch'],
+    ['tmux-claude-attach', '-t', 'ccwatch', '-d', '-n', ''],
   ])
-  expect(ran.result).toMatch(/に出した/)
+  expect(runs.some(a => a[0] === 'claude' && a[1] === '--bg')).toBe(false)
+  expect(ran.result).toMatch(/^ccwatch の window claude-w に出した/)
+  expect(bare.result).toMatch(/に出した/)
 })
 
-// tmux-project and tmux-claude-attach answer as in `engine`; claude-session-name as `name` says.
-function namingEngine(on: any, runs: string[][], name: (argv: string[]) => { exitCode: number; stdout?: string; stderr?: string }) {
-  claudeOnly(on, runs, argv =>
-    argv[0] === 'claude-session-name'
-      ? name(argv)
+test('session-prepare passes on why tmux-claude-attach could not start a session', async ($, on) => {
+  claudeOnly(on, [], argv =>
+    argv[0] === 'tmux-claude-attach'
+      ? { exitCode: 1, stderr: 'tmux-claude-attach: claude agents が失敗した\n' }
       : argv[0] === 'tmux-project'
         ? { exitCode: 0, stdout: argv[1] === '-l' ? REPOS.map(r => `  ${r.name}\t${r.path}`).join('\n') : 'ccwatch\n' }
-        : argv[0] === 'tmux-claude-attach'
-          ? { exitCode: 0, stdout: 'claude-w\n' }
-          : { exitCode: 0 },
+        : { exitCode: 0 },
   )
-}
-
-test('a new session is not started when claude-session-name cannot name it', async ($, on) => {
-  const runs: string[][] = []
-  namingEngine(on, runs, () => ({ exitCode: 1, stderr: 'jq: parse error\n' }))
 
   const ran: any = await $.tool.call({ tool: PREPARE, repo: 'ccwatch', label: 'review' } as any)
 
-  expect(ran.result).toBe('Could not name a new session: jq: parse error')
-  expect(runs.some(a => a[1] === '--bg')).toBe(false)
-})
-
-test('without claude-session-name no session is started, under any other name', async ($, on) => {
-  const runs: string[][] = []
-  // A throwing hook makes process.run reject, as a command that cannot start does.
-  namingEngine(on, runs, () => {
-    throw new Error('claude-session-name: command not found')
-  })
-
-  const ran: any = await $.tool.call({ tool: PREPARE, repo: 'ccwatch', label: 'review' } as any)
-
-  expect(ran.result).toMatch(/^claude-session-name を実行できないので、新しいセッションは起動しません/)
-  expect(runs.some(a => a[1] === '--bg')).toBe(false)
-  // What needs no new name still works.
-  const prepared: any = await $.tool.call({ tool: PREPARE, session: 'ccwatch' } as any)
-  expect(runs.filter(a => a[0] === 'tmux-claude-attach')).toEqual([['tmux-claude-attach', '-t', 'ccwatch', '-d', '-i', 'w-id']])
-  expect(prepared.result).toMatch(/に出した/)
+  expect(ran.result).toBe('tmux-claude-attach failed: tmux-claude-attach: claude agents が失敗した')
 })
 
 test('a window keeps the name of its session', async ($, on) => {
   const runs: string[][] = []
   // @1 is ccwatch's under an old name, @2 already right, @3 a session no longer listed, @4 not Claude's.
   const windows = ['@1\tw-id\told', '@2\tme-id\tme', '@3\tgone-id\tgone', '@4\t\tzsh', ''].join('\n')
-  engine(on, AGENTS, runs, undefined, windows)
+  engine(on, AGENTS, runs, windows)
 
   await $.tool.call({ tool: 'mcp__tmux-agents__session-stop', session: 'ccwatch' } as any)
 

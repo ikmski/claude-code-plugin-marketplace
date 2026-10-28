@@ -116,7 +116,7 @@ chrome-devtools-mcp（MCP サーバ）で Chrome を操作できるようにす�
 ### tmux-agents Plugin
 Location: `plugins/tmux-agents/`
 
-agent view（`claude agents`）のバックグラウンドセッション（`claude --bg`）を、リポジトリごとの tmux session / window で扱う mod（`hooks/hooks.json` が TypeScript の hooks モジュールを読む形式）。ペインで一覧を見て行から window へ移り、モデルは一覧・window の用意・停止ができる。セッション間のやり取り（依頼・返信）は持たない。user scope で入れ、`/tmux-agents` でペインを開いたセッションが、開いている間だけポーリングする。依存する `claude-session-name` / `tmux-project` / `tmux-claude-attach` は ikmski/nix-config が配る。
+agent view（`claude agents`）のバックグラウンドセッション（`claude --bg`）を、リポジトリごとの tmux session / window で扱う mod（`hooks/hooks.json` が TypeScript の hooks モジュールを読む形式）。ペインで一覧を見て行から window へ移り、モデルは一覧・window の用意・停止ができる。セッション間のやり取り（依頼・返信）は持たない。user scope で入れ、`/tmux-agents` でペインを開いたセッションが、開いている間だけポーリングする。依存する `tmux-project` / `tmux-claude-attach` は ikmski/nix-config が配る（新しいセッションの名前の規則も tmux-claude-attach が持つ）。
 
 - このプラグインだけはテストを持つ。変更後は `claude plugin validate plugins/tmux-agents` と `claude plugin test plugins/tmux-agents` を通す
 
