@@ -523,15 +523,19 @@ export const register: Register = on => {
             <Text bold>{short(g.path)}</Text>
             {g.rows.map(r => (
               <Box key={r.sessionId} justifyContent="space-between">
-                <Button key={r.sessionId} plain onPress={() => void jump(r)}>
-                  <Text color={color(r)} dimColor={isStopped(r)} wrap="truncate-end">
-                    {' '}
-                    {mark(r)} {r.name}
+                {/* A Button's label does not truncate: a long name wraps within its column, and the state keeps its place. */}
+                <Box flexShrink={1}>
+                  <Button key={r.sessionId} plain onPress={() => void jump(r)}>
+                    <Text color={color(r)} dimColor={isStopped(r)}>
+                      {` ${mark(r)} ${r.name}`}
+                    </Text>
+                  </Button>
+                </Box>
+                <Box flexShrink={0}>
+                  <Text color={color(r)} dimColor={isStopped(r)}>
+                    {` ${label(r)} ${age(r.startedAt, now)}`}
                   </Text>
-                </Button>
-                <Text color={color(r)} dimColor={isStopped(r)}>
-                  {label(r)} {age(r.startedAt, now)}
-                </Text>
+                </Box>
               </Box>
             ))}
           </Box>

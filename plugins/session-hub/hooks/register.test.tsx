@@ -291,7 +291,7 @@ test('the pane lists background sessions under their repository, on every surfac
     const ui = await $.ui.mount({ ...PANE, surface })
     expect((await ui.find({ type: 'Text', text: 'ikmski/ccwatch' }))?.text).toBe('ikmski/ccwatch')
     expect((await ui.find({ type: 'Text', text: /● ccwatch/ }))?.text).toBe(' ● ccwatch')
-    expect((await ui.find({ type: 'Text', text: /^working / }))).not.toBe(undefined)
+    expect((await ui.find({ type: 'Text', text: /^ working / }))).not.toBe(undefined)
     await ui.unmount()
   }
 })
