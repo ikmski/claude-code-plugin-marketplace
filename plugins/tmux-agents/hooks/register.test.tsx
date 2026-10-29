@@ -213,6 +213,30 @@ test('the pane lists background sessions under their repository, on every surfac
   }
 })
 
+test("the pane paints each state in the color claude-tmux-status gives the tmux tab", async ($, on) => {
+  const cwd = '/home/u/develop/ikmski/ccwatch'
+  const rows = [
+    row({ sessionId: 'a', name: 'busy', cwd, state: 'working', status: 'busy' }),
+    row({ sessionId: 'b', name: 'asks', cwd, state: 'blocked' }),
+    row({ sessionId: 'c', name: 'over', cwd, state: 'done', status: 'idle' }),
+    row({ sessionId: 'd', name: 'gone', cwd, state: 'stopped' }),
+  ]
+  engine(on, rows, [])
+  await $.tool.call({ tool: 'mcp__tmux-agents__session-list' } as any)
+
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  const colorOf = async (name: string) => {
+    const found = await ui.find({ type: 'Text', text: new RegExp(` ${name}$`) })
+    expect(found).not.toBe(undefined)
+    return found?.props.color
+  }
+  expect(await colorOf('busy')).toBe('#f0c674')
+  expect(await colorOf('asks')).toBe('#cc6666')
+  expect(await colorOf('over')).toBe('#b5bd68')
+  expect(await colorOf('gone')).toBe(undefined)
+  await ui.unmount()
+})
+
 test('pressing a session in the pane switches to its tmux window', async ($, on) => {
   const runs: string[][] = []
   engine(on, AGENTS, runs)
@@ -232,6 +256,32 @@ test('pressing a session in the pane switches to its tmux window', async ($, on)
     ['tmux-claude-attach', '-t', 'ccwatch', '-i', 'w-id', '-c', '/dev/pts/1'],
   ])
   expect(toasts).toEqual(['Opened ccwatch in tmux.'])
+})
+
+test("a session in a worktree goes to its repository's tmux session from the pane, /tmux-agents-switch and session-prepare", async ($, on) => {
+  const runs: string[][] = []
+  const inWorktree = row({ sessionId: 'wt-id', id: 'wt', name: 'refactor', cwd: '/home/u/develop/ikmski/ccwatch/.claude/worktrees/fix-x' })
+  engine(on, [AGENTS[0]!, inWorktree], runs)
+  on('ui.toast', () => ({ value: undefined }))
+  await $.tool.call({ tool: 'mcp__tmux-agents__session-list' } as any)
+
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  await ui.press({ key: 'wt-id' })
+  await ui.unmount()
+  await $.command.run({ command: 'tmux-agents-switch', args: 'refactor' } as any)
+  await $.tool.call({ tool: PREPARE, session: 'refactor' } as any)
+
+  // tmux-project names the session after the repository, as when it opens the repository itself.
+  expect(runs.filter(a => a[0] === 'tmux-project' && a[1] === '-d').map(a => a[2])).toEqual([
+    '/home/u/develop/ikmski/ccwatch',
+    '/home/u/develop/ikmski/ccwatch',
+    '/home/u/develop/ikmski/ccwatch',
+  ])
+  expect(runs.filter(a => a[0] === 'tmux-claude-attach')).toEqual([
+    ['tmux-claude-attach', '-t', 'ccwatch', '-i', 'wt-id', '-c', '/dev/pts/1'],
+    ['tmux-claude-attach', '-t', 'ccwatch', '-i', 'wt-id', '-c', '/dev/pts/1'],
+    ['tmux-claude-attach', '-t', 'ccwatch', '-d', '-i', 'wt-id'],
+  ])
 })
 
 test('/tmux-agents opens the pane narrow, and closes it when it is open', async ($, on) => {

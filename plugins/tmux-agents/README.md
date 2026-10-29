@@ -51,6 +51,8 @@ Claude Code に断られたものだけが欠けて、その旨を transcript �
   閉じるマークや ctrl+x x でも閉じる）。ペインはリポジトリごとにまとめ（Claude Code の worktree
   `<repo>/.claude/worktrees/<name>` で動くセッションはそのリポジトリの下に出す）、行を押すとそのセッションの
   tmux window へ画面を切り替える。ペインには自分も出る。
+- window は、そのリポジトリの tmux session（無ければ tmux-project で開いたときと同じリポジトリ名で作る）に
+  用意する。worktree で動くセッションも、worktree ではなくリポジトリの tmux session に入る。
 - 一覧: ツール `session-list`（`claude agents` の JSON）。
 - 片付け: `session-stop`（会話は残り、attach すると再開する）はツール、`/tmux-agents-rm`（worktree ごと消す）は
   人が打つコマンドだけ。
