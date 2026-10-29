@@ -161,16 +161,19 @@ export async function prepare($: EngineInterface, args: PrepareArgs): Promise<st
   return prepareWindow($, repo.path, ['-n', args.label ?? ''])
 }
 
-// Sets up the tmux session of `path` without switching to it (a background
-// session runs outside tmux, where a plain `tmux-project <path>` attaches and
-// fails with "not a terminal"), then runs tmux-claude-attach in it with `args`.
-// Answers the tmux session and what tmux-claude-attach printed, or why not.
+// Sets up the tmux session of `path`'s repository without switching to it (a
+// background session runs outside tmux, where a plain `tmux-project <path>`
+// attaches and fails with "not a terminal"), then runs tmux-claude-attach in
+// it with `args`. A session in a worktree goes to its repository's tmux
+// session, named as tmux-project names one it opens; tmux-claude-attach counts
+// the repository's worktree sessions as its own. Answers the tmux session and
+// what tmux-claude-attach printed, or why not.
 async function attachIn(
   $: EngineInterface,
   path: string,
   args: string[],
 ): Promise<{ session: string; printed: string } | string> {
-  const project = await $.process.run(['tmux-project', '-d', path])
+  const project = await $.process.run(['tmux-project', '-d', repoRoot(path)])
   if (project.exitCode !== 0) return `tmux-project failed: ${project.stderr.trim()}`
   const session = project.stdout.trim()
   if (!session) return `tmux-project -d printed no session name for ${path}.`
