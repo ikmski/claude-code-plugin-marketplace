@@ -142,6 +142,16 @@ function label(row: AgentRow): string {
   return row.state ?? row.status
 }
 
+// The colors claude-tmux-status (ikmski/nix-config) paints a session's tmux
+// tab with, from the vim-hybrid palette, so the pane and the tabs agree.
+// `idle` is the status of a session whose state is `done`.
+const STATE_COLORS: Record<string, string> = {
+  working: '#f0c674',
+  blocked: '#cc6666',
+  done: '#b5bd68',
+  idle: '#b5bd68',
+}
+
 export type PrepareArgs = { session?: string; repo?: string; label?: string }
 
 // For the model: the user's screen stays where it is. A session is found by
@@ -391,7 +401,7 @@ export const register: Register = on => {
     const groups = paneGroups((await read($, sessions)).filter(r => r.kind === 'background'))
     const err = await read($, error)
     const now = Date.now()
-    const color = (r: AgentRow) => (isWorking(r) ? 'yellow' : r.status === 'idle' ? 'green' : undefined)
+    const color = (r: AgentRow) => STATE_COLORS[label(r)]
     const mark = (r: AgentRow) => (isWorking(r) ? '●' : isStopped(r) ? '◌' : '○')
     const jump = async (r: AgentRow) => $.ui.toast(await switchTo($, r.cwd, ['-i', r.sessionId]))
 

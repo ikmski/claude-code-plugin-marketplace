@@ -213,6 +213,30 @@ test('the pane lists background sessions under their repository, on every surfac
   }
 })
 
+test("the pane paints each state in the color claude-tmux-status gives the tmux tab", async ($, on) => {
+  const cwd = '/home/u/develop/ikmski/ccwatch'
+  const rows = [
+    row({ sessionId: 'a', name: 'busy', cwd, state: 'working', status: 'busy' }),
+    row({ sessionId: 'b', name: 'asks', cwd, state: 'blocked' }),
+    row({ sessionId: 'c', name: 'over', cwd, state: 'done', status: 'idle' }),
+    row({ sessionId: 'd', name: 'gone', cwd, state: 'stopped' }),
+  ]
+  engine(on, rows, [])
+  await $.tool.call({ tool: 'mcp__tmux-agents__session-list' } as any)
+
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  const colorOf = async (name: string) => {
+    const found = await ui.find({ type: 'Text', text: new RegExp(` ${name}$`) })
+    expect(found).not.toBe(undefined)
+    return found?.props.color
+  }
+  expect(await colorOf('busy')).toBe('#f0c674')
+  expect(await colorOf('asks')).toBe('#cc6666')
+  expect(await colorOf('over')).toBe('#b5bd68')
+  expect(await colorOf('gone')).toBe(undefined)
+  await ui.unmount()
+})
+
 test('pressing a session in the pane switches to its tmux window', async ($, on) => {
   const runs: string[][] = []
   engine(on, AGENTS, runs)
