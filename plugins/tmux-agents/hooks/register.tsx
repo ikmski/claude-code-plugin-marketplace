@@ -9,6 +9,9 @@ const PANE = 'tmux-agents'
 const PANE_COLUMNS = 32
 // Every poll starts a `claude agents` process, so keep it slow.
 const POLL_MS = 15_000
+// A /clear empties every plugin's $.state once its session.end hooks have run,
+// so the list is read again after it rather than from the hook.
+const CLEAR_REFRESH_MS = 1_000
 
 const sessions = atom({ plugin: 'tmux-agents', key: 'sessions' } as const, [], {
   shape: 'sessions-1',
@@ -243,12 +246,21 @@ export async function stopOrRemove($: EngineInterface, verb: 'stop' | 'rm', name
 }
 
 // The list is polled only while the pane is open, whether or not anyone looks
-// at it, and closing it stops the poll.
+// at it, and closing it stops the poll. A reload of the module drops the timer
+// while the pane stays open, so session.start polls again for an open pane.
 let poll: { cancel: () => void } | undefined
+
+async function isPaneOpen($: EngineInterface): Promise<boolean> {
+  return (await $.ui.panes()).some(p => p.id === PANE)
+}
 
 async function openPane($: EngineInterface): Promise<void> {
   await refresh($)
   await $.ui.open({ id: PANE, title: 'Agents', columns: PANE_COLUMNS })
+  startPolling($)
+}
+
+function startPolling($: EngineInterface): void {
   poll ??= $.clock.every(POLL_MS, () => refresh($))
 }
 
@@ -348,8 +360,17 @@ export const register: Register = on => {
     // Every session gets the commands and the deferred tools, and nothing
     // runs until the pane is opened or a tool is called.
     await declare($)
+    if (await isPaneOpen($)) {
+      await refresh($)
+      startPolling($)
+    }
 
     return started
+  })
+
+  on('session.end', async ($, e, next) => {
+    if (e.reason === 'clear' && (await isPaneOpen($))) $.clock.after(CLEAR_REFRESH_MS, () => void refresh($))
+    return next(e)
   })
 
   on('ui.close', async ($, e, next) => {
@@ -375,7 +396,7 @@ export const register: Register = on => {
   })).catch(($, e, next) => ({ deny: `tmux-agents: session-stop failed: ${String(next.error)}` }))
 
   on('command.run', { command: 'tmux-agents' }, async $ => {
-    if ((await $.ui.panes()).some(p => p.id === PANE)) {
+    if (await isPaneOpen($)) {
       await $.ui.close({ id: PANE })
       stopPolling()
       return { text: 'Agents pane closed.' }

@@ -312,10 +312,9 @@ test('/tmux-agents opens the pane narrow, and closes it when it is open', async 
 })
 
 // The pane as the engine keeps it, and the `claude agents` runs that poll it.
-function paneEngine(on: any) {
+function paneEngine(on: any, { isOpen = false } = {}) {
   const runs: string[][] = []
   const clock = mock.clock(on)
-  let isOpen = false
   claudeOnly(on, runs, () => ({ exitCode: 0 }))
   on('ui.panes', () => ({
     value: isOpen ? [{ id: 'tmux-agents', title: 'Agents', isShown: true, isFocused: false, isPlaced: true }] : [],
@@ -466,5 +465,43 @@ test('session start registers the commands and deferred tools, and runs nothing'
   expect(tools.every(t => t.isDeferred === true)).toBe(true)
   expect(opened).toEqual([])
   expect(runs).toEqual([])
+})
+
+const CLEAR = { reason: 'clear', sessionId: 's', resume: { id: 's' } } as any
+
+test('after /clear the open pane reads the list again without waiting for the poll', async ($, on) => {
+  const { clock, polls } = paneEngine(on)
+  on('session.end', (_: unknown, e: any) => ({ sessionId: e.sessionId }))
+
+  await $.command.run({ command: 'tmux-agents' } as any)
+  await $.session.end(CLEAR)
+  expect(polls()).toBe(1)
+  await clock.advance(1_000)
+  expect(polls()).toBe(2)
+
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  expect((await ui.find({ type: 'Text', text: /● ccwatch/ }))?.text).toBe(' ● ccwatch')
+  await ui.unmount()
+})
+
+test('a /clear with the pane closed reads nothing', async ($, on) => {
+  const { clock, polls } = paneEngine(on)
+  on('session.end', (_: unknown, e: any) => ({ sessionId: e.sessionId }))
+
+  await $.session.end(CLEAR)
+  await clock.advance(15_000)
+  expect(polls()).toBe(0)
+})
+
+test('a reload with the pane open polls again', async ($, on) => {
+  // The pane was opened before the reload, and the module's poll went with it.
+  const { clock, polls } = paneEngine(on, { isOpen: true })
+  on('session.start', (_: unknown, e: any) => ({ cwd: e.cwd }))
+  on('command.register', (_: unknown, e: any) => ({ value: { command: e.name } }))
+  on('tool.register', (_: unknown, e: any) => ({ value: { tool: `mcp__tmux-agents__${e.name}` } }))
+  await $.session.start({ cwd: '/home/u/notes', surface: null, isInteractive: false } as any)
+  expect(polls()).toBe(1)
+  await clock.advance(15_000)
+  expect(polls()).toBe(2)
 })
 
