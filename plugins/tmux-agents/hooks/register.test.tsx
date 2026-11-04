@@ -312,23 +312,29 @@ test('/tmux-agents opens the pane narrow, and closes it when it is open', async 
 })
 
 // The pane as the engine keeps it, and the `claude agents` runs that poll it.
-function paneEngine(on: any, { isOpen = false } = {}) {
+// `isPlaced` false stands for a pane opened unasked that no surface draws.
+function paneEngine(on: any, { isOpen = false, isPlaced = true } = {}) {
   const runs: string[][] = []
+  const opens: any[] = []
   const clock = mock.clock(on)
   claudeOnly(on, runs, () => ({ exitCode: 0 }))
   on('ui.panes', () => ({
-    value: isOpen ? [{ id: 'tmux-agents', title: 'Agents', isShown: true, isFocused: false, isPlaced: true }] : [],
+    value: isOpen ? [{ id: 'tmux-agents', title: 'Agents', isShown: isPlaced, isFocused: false, isPlaced }] : [],
   }))
-  on('ui.open', () => {
+  on('ui.open', (_: unknown, e: any) => {
+    opens.push(e)
     isOpen = true
-    return { value: { isPlaced: true } }
+    return { value: isPlaced ? { isPlaced: true } : { isPlaced: false, reason: 'narrow' } }
   })
   on('ui.close', () => {
     isOpen = false
     return { value: undefined }
   })
   const polls = () => runs.filter(a => a[1] === 'agents').length
-  return { clock, polls }
+  const seat = () => {
+    isPlaced = true
+  }
+  return { clock, polls, opens, seat, isOpen: () => isOpen }
 }
 
 test('the list is polled only while the pane is open', async ($, on) => {
@@ -505,3 +511,91 @@ test('a reload with the pane open polls again', async ($, on) => {
   expect(polls()).toBe(2)
 })
 
+
+const START = { cwd: '/home/u/notes', surface: 'terminal', isInteractive: true } as any
+
+function declares(on: any) {
+  on('session.start', (_: unknown, e: any) => ({ cwd: e.cwd }))
+  on('command.register', (_: unknown, e: any) => ({ value: { command: e.name } }))
+  on('tool.register', (_: unknown, e: any) => ({ value: { tool: `mcp__tmux-agents__${e.name}` } }))
+}
+
+test('a session a person is at opens the pane, and leaves an open one as it is', async ($, on) => {
+  const { opens, polls } = paneEngine(on)
+  declares(on)
+
+  await $.session.start(START)
+  expect(opens).toEqual([{ id: 'tmux-agents', title: 'Agents', columns: 32 }])
+  expect(polls()).toBe(1)
+
+  await $.session.start(START)
+  expect(opens.length).toBe(1)
+})
+
+test('a pane no surface draws reads nothing until one does', async ($, on) => {
+  const { clock, polls, seat } = paneEngine(on, { isPlaced: false })
+  declares(on)
+
+  await $.session.start(START)
+  await clock.advance(15_000 * 2)
+  expect(polls()).toBe(0)
+
+  seat()
+  await clock.advance(15_000)
+  expect(polls()).toBe(1)
+})
+
+const BAND = {
+  plugin: 'tmux-agents',
+  component: 'AbovePrompt',
+  props: {
+    hasSurvey: false,
+    isWorking: false,
+    maxRows: 10,
+    bodyColumns: 80,
+    scroll: { offset: 0, bodyRows: 10 },
+    view: {},
+  },
+} as const
+
+const toggleLabel = async (ui: any) => (await ui.find({ type: 'Button', key: 'toggle' }))?.props.label
+
+test("the band's button closes the open pane and opens it again", async ($, on) => {
+  const { opens, isOpen } = paneEngine(on)
+  declares(on)
+  await $.session.start(START)
+
+  const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
+  expect(await toggleLabel(ui)).toBe('閉じる')
+  await ui.press({ key: 'toggle' })
+  expect(isOpen()).toBe(false)
+  expect(await toggleLabel(ui)).toBe('開く')
+  await ui.press({ key: 'toggle' })
+  expect(isOpen()).toBe(true)
+  expect(opens.length).toBe(2)
+  await ui.unmount()
+})
+
+test("the band's button opens a pane waiting undrawn again, which seats it", async ($, on) => {
+  const { opens } = paneEngine(on, { isPlaced: false })
+  declares(on)
+  await $.session.start(START)
+
+  const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
+  expect(await toggleLabel(ui)).toBe('開く')
+  await ui.press({ key: 'toggle' })
+  expect(opens.length).toBe(2)
+  await ui.unmount()
+})
+
+test('the band yields to a survey', async ($, on) => {
+  paneEngine(on)
+  on('ui.render', ($: any, e: any) => {
+    const { Text } = $.ui.resolve(e)
+    return <Text>engine</Text>
+  })
+
+  const ui = await $.ui.mount({ ...BAND, props: { ...BAND.props, hasSurvey: true }, surface: 'terminal' })
+  expect(await ui.find({ type: 'Button', key: 'toggle' })).toBe(undefined)
+  await ui.unmount()
+})

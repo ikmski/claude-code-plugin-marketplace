@@ -19,6 +19,10 @@ const sessions = atom({ plugin: 'tmux-agents', key: 'sessions' } as const, [], {
 const error = atom({ plugin: 'tmux-agents', key: 'error' } as const, '', {
   shape: 'error-1',
 })
+// Whether a surface draws the pane, which the band's button reads.
+const paneShown = atom({ plugin: 'tmux-agents', key: 'paneShown' } as const, false, {
+  shape: 'paneShown-1',
+})
 
 type Repo = { name: string; path: string }
 
@@ -245,23 +249,53 @@ export async function stopOrRemove($: EngineInterface, verb: 'stop' | 'rm', name
   return said || `${verb === 'stop' ? 'Stopped' : 'Removed'} ${worker.name}.`
 }
 
-// The list is polled only while the pane is open, whether or not anyone looks
-// at it, and closing it stops the poll. A reload of the module drops the timer
-// while the pane stays open, so session.start polls again for an open pane.
+// The timer runs while the pane is open, and the list is read only while a
+// surface draws it: every interactive session opens the pane, and one nobody
+// is attached to (a background session) or too narrow to seat it unasked
+// leaves it waiting undrawn. Closing it stops the timer. A reload of the module
+// drops the timer while the pane stays open, so session.start polls again.
 let poll: { cancel: () => void } | undefined
 
+async function paneOf($: EngineInterface) {
+  return (await $.ui.panes()).find(p => p.id === PANE)
+}
+
 async function isPaneOpen($: EngineInterface): Promise<boolean> {
-  return (await $.ui.panes()).some(p => p.id === PANE)
+  return (await paneOf($)) !== undefined
+}
+
+async function refreshIfPlaced($: EngineInterface): Promise<void> {
+  const isPlaced = (await paneOf($))?.isPlaced === true
+  await update($, paneShown, () => isPlaced)
+  if (isPlaced) await refresh($)
 }
 
 async function openPane($: EngineInterface): Promise<void> {
-  await refresh($)
-  await $.ui.open({ id: PANE, title: 'Agents', columns: PANE_COLUMNS })
+  const opened = await $.ui.open({ id: PANE, title: 'Agents', columns: PANE_COLUMNS })
+  await update($, paneShown, () => opened.isPlaced)
+  if (opened.isPlaced) await refresh($)
   startPolling($)
 }
 
+async function closePane($: EngineInterface): Promise<void> {
+  await $.ui.close({ id: PANE })
+  stopPolling()
+  await update($, paneShown, () => false)
+}
+
+// For /tmux-agents and the band's button: a pane waiting undrawn is opened
+// again, which the person's press or command seats at any width.
+async function togglePane($: EngineInterface): Promise<'opened' | 'closed'> {
+  if ((await paneOf($))?.isPlaced) {
+    await closePane($)
+    return 'closed'
+  }
+  await openPane($)
+  return 'opened'
+}
+
 function startPolling($: EngineInterface): void {
-  poll ??= $.clock.every(POLL_MS, () => refresh($))
+  poll ??= $.clock.every(POLL_MS, () => refreshIfPlaced($))
 }
 
 function stopPolling(): void {
@@ -357,12 +391,14 @@ export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     const started = await next(e)
 
-    // Every session gets the commands and the deferred tools, and nothing
-    // runs until the pane is opened or a tool is called.
+    // Every session gets the commands and the deferred tools; one a person
+    // is at opens the pane too, unless it is open already.
     await declare($)
     if (await isPaneOpen($)) {
-      await refresh($)
+      await refreshIfPlaced($)
       startPolling($)
+    } else if (e.isInteractive) {
+      await openPane($)
     }
 
     return started
@@ -374,7 +410,10 @@ export const register: Register = on => {
   })
 
   on('ui.close', async ($, e, next) => {
-    if (e.id === PANE) stopPolling()
+    if (e.id === PANE) {
+      stopPolling()
+      await update($, paneShown, () => false)
+    }
     return next(e)
   })
 
@@ -395,14 +434,20 @@ export const register: Register = on => {
     result: await stopOrRemove($, 'stop', String(e.session ?? '')),
   })).catch(($, e, next) => ({ deny: `tmux-agents: session-stop failed: ${String(next.error)}` }))
 
-  on('command.run', { command: 'tmux-agents' }, async $ => {
-    if (await isPaneOpen($)) {
-      await $.ui.close({ id: PANE })
-      stopPolling()
-      return { text: 'Agents pane closed.' }
-    }
-    await openPane($)
-    return { text: 'Agents pane opened.' }
+  on('command.run', { command: 'tmux-agents' }, async $ => ({
+    text: (await togglePane($)) === 'closed' ? 'Agents pane closed.' : 'Agents pane opened.',
+  }))
+
+  on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
+    if (e.props.hasSurvey) return next(e)
+    const { Box, Button, Text } = $.ui.resolve(e)
+    const isShown = await read($, paneShown)
+    return (
+      <Box>
+        <Text dimColor>Agents </Text>
+        <Button key="toggle" label={isShown ? '閉じる' : '開く'} onPress={() => void togglePane($)} />
+      </Box>
+    )
   })
 
   on('command.run', { command: 'tmux-agents-switch' }, async ($, e) => {
