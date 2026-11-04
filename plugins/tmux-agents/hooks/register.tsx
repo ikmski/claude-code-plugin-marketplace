@@ -440,12 +440,11 @@ export const register: Register = on => {
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     if (e.props.hasSurvey) return next(e)
-    const { Box, Button, Text } = $.ui.resolve(e)
+    const { Box, Button } = $.ui.resolve(e)
     const isShown = await read($, paneShown)
     return (
-      <Box>
-        <Text dimColor>Agents </Text>
-        <Button key="toggle" label={isShown ? '閉じる' : '開く'} onPress={() => void togglePane($)} />
+      <Box width={e.props.bodyColumns} justifyContent="flex-end">
+        <Button key="toggle" plain dimColor label={isShown ? '»' : '«'} onPress={() => void togglePane($)} />
       </Box>
     )
   })
