@@ -15,6 +15,7 @@ declare module 'claude-code' {
     'tmux-agents': {
       sessions: Shaped<AgentRow[]>
       error: Shaped<string>
+      paneShown: Shaped<boolean>
     }
   }
 }
