@@ -8,6 +8,7 @@ export type AgentRow = {
   status: string
   state?: string | null
   startedAt: number
+  pid?: number | null
 }
 
 declare module 'claude-code' {
