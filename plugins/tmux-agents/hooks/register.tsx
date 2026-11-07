@@ -65,8 +65,10 @@ export function findSession(rows: AgentRow[], name: string): AgentRow | undefine
     .sort((a, b) => Number(isStopped(a)) - Number(isStopped(b)) || b.startedAt - a.startedAt)[0]
 }
 
+// A session whose process stopped is listed with its last state (`done`)
+// and no pid, so the pid is what tells it apart.
 export function isStopped(row: AgentRow): boolean {
-  return row.state === 'stopped'
+  return row.state === 'stopped' || row.pid == null
 }
 
 function isWorking(row: AgentRow): boolean {
@@ -146,7 +148,7 @@ async function syncWindows($: EngineInterface, rows: AgentRow[]): Promise<void> 
 }
 
 function label(row: AgentRow): string {
-  return row.state ?? row.status
+  return isStopped(row) ? 'stopped' : (row.state ?? row.status)
 }
 
 // The colors claude-tmux-status (ikmski/nix-config) paints a session's tmux

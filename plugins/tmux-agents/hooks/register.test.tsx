@@ -19,6 +19,7 @@ const row = (over: Partial<AgentRow>): AgentRow => ({
   kind: 'background',
   status: 'idle',
   startedAt: 0,
+  pid: 1,
   ...over,
 })
 
@@ -364,6 +365,28 @@ test('a state change of a session raises no toast', async ($, on) => {
   WORKER.state = 'working'
 
   expect(toasts).toEqual([])
+})
+
+// What `claude agents --json --all` lists for a session whose process stopped.
+const STOPPED = { state: 'done', status: null as any, pid: null }
+
+test('a session listed without a pid is stopped, though its state says done', async ($, on) => {
+  const cwd = '/home/u/develop/ikmski/ccwatch'
+  const rows = [
+    row({ sessionId: 'gone', name: 'a', cwd, startedAt: 9, ...STOPPED }),
+    row({ sessionId: 'live', name: 'a', cwd, state: 'done', startedAt: 1 }),
+  ]
+  expect(findSession(rows, 'a')?.sessionId).toBe('live')
+  expect(paneGroups(rows)[0]?.rows.map(r => r.sessionId)).toEqual(['live', 'gone'])
+
+  engine(on, [rows[0]!], [])
+  await $.tool.call({ tool: 'mcp__tmux-agents__session-list' } as any)
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  const name = await ui.find({ type: 'Text', text: ' ◌ a' })
+  expect(name?.props.dimColor).toBe(true)
+  expect(name?.props.color).toBe(undefined)
+  expect((await ui.find({ type: 'Text', text: /^ stopped / }))).not.toBe(undefined)
+  await ui.unmount()
 })
 
 test('paneGroups groups by directory, working first and stopped last', () => {
