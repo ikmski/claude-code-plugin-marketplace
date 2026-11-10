@@ -209,7 +209,7 @@ async function prepareWindow($: EngineInterface, path: string, attachArgs: strin
 }
 
 // For /tmux-agents-switch: a session by its name, else a repository, where
-// tmux-claude-attach picks (one session: it; several: a picker).
+// tmux-claude-attach opens its picker whatever the number of sessions.
 async function switchToQuery($: EngineInterface, query: string): Promise<string> {
   const worker = findSession(await listRows($), query)
   if (worker) return switchTo($, worker.cwd, ['-i', worker.sessionId])
