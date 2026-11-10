@@ -49,7 +49,7 @@ Claude Code に断られたものだけが欠けて、その旨を transcript �
   指定すればそのバックグラウンドセッションに attach し、省略すればリポジトリで新しいセッションを
   起動してから attach する（どちらも tmux-claude-attach が行う）。
 - `/tmux-agents-switch <session|repo>`（コマンド）: 同じように用意したうえで、人の画面をそこへ切り替える。
-  セッション名でなければリポジトリとして扱い、`tmux-claude-attach` が選ぶ（複数あれば選択の popup）。
+  セッション名でなければリポジトリとして扱い、`tmux-claude-attach` の popup で選ぶ（セッションの数によらず出る）。
 - バックグラウンドセッションの状態を出すドックペイン「Agents」。帯のボタンか `/tmux-agents` で開閉を切り替える（ペインの
   閉じるマークや ctrl+x x でも閉じる）。ペインはリポジトリごとにまとめ（Claude Code の worktree
   `<repo>/.claude/worktrees/<name>` で動くセッションはそのリポジトリの下に出す）、行を押すとそのセッションの
